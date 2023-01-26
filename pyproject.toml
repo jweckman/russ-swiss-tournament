@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "russ-swiss-tournament"
+version = "0.1.0"
+description = ""
+authors = ["Joakim Weckman <joakim.weckman@gmail.com>"]
+readme = "README.md"
+packages = [{include = "russ_swiss_tournament"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pytest = "^7.2.1"
+tomli = "^2.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,14 @@
+session_name: russ
+windows:
+- window_name: code
+  shell_command_before:
+    - cd ~/code/russ_swiss_tournament
+  panes:
+    - shell_command:
+        - nvim russ_swiss_tournament/matchup.py russ_swiss_tournament/round.py russ_swiss_tournament/tie_break.py russ_swiss_tournament/tournament.py russ_swiss_tournament/player.py tests/test_backend.py
+- window_name: run
+  shell_command_before:
+    - cd ~/code/russ_swiss_tournament
+  panes:
+    - shell_command:
+        - poetry shell
