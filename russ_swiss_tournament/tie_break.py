@@ -6,13 +6,7 @@ from russ_swiss_tournament.matchup import MatchResult, Color, PlayerMatch
 class TieBreakMethod(Enum):
     HARKNESS = 1
 
-def calc_harkness(rounds:list[Round], player_ids: set):
-    '''
-    First calculate model scores for each player.
-    Then populate a wins by player dict.
-    Sum scores of wins, removing top and bottom values depending on round count
-    '''
-
+def harkness_model_scores_player_wins(rounds, player_ids):
     res_valuation = {
         MatchResult.WIN: 1,
         MatchResult.LOSS: 0,
@@ -26,43 +20,40 @@ def calc_harkness(rounds:list[Round], player_ids: set):
     wbp = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
     for r in rounds:
         for m in r.matchups:
-            res_black = m.res[Color.B].res
-            res_white = m.res[Color.W].res
-            white = m.res[Color.W].id
-            black = m.res[Color.W].id
+            winner_loser_colors = m.get_winner_loser_colors()
 
-            winner = None
-            if res_white == MatchResult.WIN:
-                winner = white
-                winner_res = res_white
-                loser = black
-                loser_res = res_black
-            elif res_black == MatchResult.WIN:
-                winner = black
-                winner_res = res_black
-                loser = white
-                loser_res = res_white
-            if winner:
-                wbp[winner].append(loser)
-            if {loser_res, winner_res} == {MatchResult.WIN, MatchResult.WALKOVER}:
-                pms[winner] = res_valuation[loser_res]
-                pms[loser] = 0
+            if winner_loser_colors:
+                wbp[m.res[winner_loser_colors[0]].id].append(m.res[winner_loser_colors[1]].id)
+            if ({m.res[Color.W].res, m.res[Color.B].res} == {MatchResult.WIN, MatchResult.WALKOVER}
+                    and winner_loser_colors ):
+                pms[m.res[winner_loser_colors[0]].id] = res_valuation[m.res[winner_loser_colors[1]].res]
+                pms[m.res[winner_loser_colors[1]].id] = 0
             else:
-                pms[white].append(res_valuation[res_white])
-                pms[black].append(res_valuation[res_black])
+                pms[m.res[Color.W].id].append(res_valuation[m.res[Color.W].res])
+                pms[m.res[Color.B].id].append(res_valuation[m.res[Color.B].res])
 
     pms = {k:(sum(v) or 0) for k,v in pms.items()}
-    # player_total_gains
-    ptg = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
+    return pms, wbp
+
+def calc_harkness(rounds:list[Round], player_ids: set):
+    '''
+    First calculate model scores for each player.
+    Then populate a wins by player with which players have been won against.
+    Sum scores of wins, removing top and bottom values depending on round count.
+    Real rules arbitrarily only kick in after 5 rounds and up (makes testing easier)
+    '''
+    player_model_scores, wins_by_player = harkness_model_scores_player_wins(rounds, player_ids)
+
+    player_total_gains = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
 
     nine_or_more_rounds = len(rounds) > 8
-    for player, defeated_players in wbp.items():
+    for player, defeated_players in wins_by_player.items():
         for dp in defeated_players:
-            ptg[player].append(pms[dp])
+            player_total_gains[player].append(player_model_scores[dp])
 
     res = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
-    for player, scores in ptg.items():
-        if len(rounds) > 2:
+    for player, scores in player_total_gains.items():
+        if len(rounds) > 4:
             scores.pop(scores.index(max(scores)))
             scores.pop(scores.index(min(scores)))
             if nine_or_more_rounds:

@@ -66,6 +66,7 @@
 
 import pytest
 from pathlib import Path
+from random import choices
 
 from russ_swiss_tournament.tournament import Tournament
 from russ_swiss_tournament.player import Player
@@ -130,19 +131,30 @@ def test_should_create_valid_round():
 
 # # TIE-BREAK
 
-# def create_players(count):
-#     players = []
-#     for i in range(count):
-#         val = i + 1
-#         players.append(Player(val, f"p{val}f", f"p{val}l"))
-#     return players
+def create_players(count):
+    players = []
+    for i in range(count):
+        val = i + 1
+        players.append(Player(val, f"p{val}f", f"p{val}l"))
+    return players
 
-# def create_round_matchups(data:dict):
-#     '''(player_id, player_id): ('WIN','LOSS') UNFINISHED'''
-#     round_matchups = []
-#     for i, (k,v) in enumerate(data.items()):
-#         round_matchups.append(Matchup(i+1, (k, MatchResult(v), (k, MatchResult(v)))))
-#
+def create_random_round(matchup_count):
+    round_matchups = []
+    matchup_results = [
+        [MatchResult.WIN, MatchResult.LOSS],
+        [MatchResult.LOSS, MatchResult.WIN],
+        [MatchResult.WIN, MatchResult.WALKOVER],
+        [MatchResult.DRAW, MatchResult.DRAW],
+    ]
+    first = 1
+    second = 2
+    for i in range(matchup_count):
+        mr = choices(matchup_results, [20, 15, 50, 15])[0]
+        round_matchups.append(Matchup({Color.W: PlayerMatch(first, mr[0]),Color.B: PlayerMatch(second, mr[1])}))
+        first += 2
+        second += 2
+    return Round(round_matchups)
+
 # def create_rounds(players, count, round_matchups=None):
 #     rounds = []
 #     if not round_matchups:
@@ -155,16 +167,18 @@ def test_should_create_valid_round():
 #     return rouBds
 
 def test_should_calculate_harkness_correctly():
+    # TODO: tournament witout create_players is broken
     t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'russ_24' / 'config.toml', create_players=True)
+    # t.players = list(create_players(14))
+    # r = create_random_round(7)
+    # rr = r.get_results()
+    s = t.get_standings()
+    fp = t.get_faced_players()
+    nr = t.generate_round()
     t.calculate_tie_break_results()
-
-    # round_matchups.append([m13,m14,m15,m16,m17,m18,m19,m20,m21,m22,m23,m24])
-    # for m in round_matchups[0]:
-    #     print(m.player_white_id_res, m.player_black_id_res)
-
-    # rounds = create_rounds(players, 24, round_matchups)
-    # player_scores = calc_harkness(rounds, set([p.id for p in players]))
-    # TODO: check why not all players have 2 values and outcomes seem weird
+    # TODO: Create a tournament result random generator
+        # - assign probabilities for matchup compositions
+        # - generate next round based on results
     assert True == False
 
 

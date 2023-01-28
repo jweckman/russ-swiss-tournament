@@ -73,3 +73,12 @@ class Matchup:
         self.res[Color.W].res = white_res
         self.res[Color.B].res = black_res
 
+    def get_winner_loser_colors(self) -> tuple[Color,Color] | None:
+        '''None means no winner. Winner first loser second in returned tuple'''
+        winner_loser_colors = None
+        if self.res[Color.W].res == MatchResult.WIN:
+            winner_loser_colors = (Color.W, Color.B)
+        elif self.res[Color.B].res == MatchResult.WIN:
+            winner_loser_colors = (Color.B, Color.W)
+        return winner_loser_colors
+

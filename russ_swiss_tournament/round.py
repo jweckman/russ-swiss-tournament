@@ -19,19 +19,28 @@ match_result_manual_map = {
     False: MatchResult.UNSET,
 }
 
+match_result_score_map = {
+    MatchResult.WIN:  1,
+    MatchResult.LOSS: 0,
+    MatchResult.DRAW: 0.5,
+    MatchResult.UNSET: None,
+    MatchResult.WALKOVER: 0,
+}
+
 class Round:
+    '''Note: index var starts from 1 to match with csv file names'''
     id_iter = itertools.count()
     def __init__(
             self,
             matchups: list[Matchup],
-            index: int = 0,
+            index: int = 1,
         ):
         self.id = next(self.id_iter)
         self.matchups = matchups
         self.index = index
 
     @classmethod
-    def match_player(cls, s:str, players: set[Player]) -> int:
+    def match_player(cls, s:str, players: list[Player]) -> int:
         res = None
         try:
             res= int(s)
@@ -48,7 +57,7 @@ class Round:
             cls,
             path,
             index,
-            players: set[Player] | None = None
+            players: list[Player] | None = None
         ):
         matchups = []
         with open(path, newline='') as csv_file:
@@ -69,4 +78,31 @@ class Round:
                 })
                 matchups.append(matchup)
         return cls(matchups, index)
+
+    @classmethod
+    def create_initial(self):
+        # TODO initial round gen
+        pass
+
+    @classmethod
+    def create_next(self, standings):
+        prs = prev_round.get_results()
+        pass
+
+    def get_results(self) -> dict[int,float]:
+        player_ids = self.get_player_ids()
+        results = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
+        for m in self.matchups:
+            results[m.res[Color.W].id] = match_result_score_map[m.res[Color.W].res]
+            results[m.res[Color.B].id] = match_result_score_map[m.res[Color.B].res]
+        return results
+
+    def get_player_ids(self):
+        player_ids = set()
+        for m in self.matchups:
+            rps = [p.id for p in m.res.values()]
+            for p in rps:
+                player_ids.add(p)
+        return player_ids
+
 
