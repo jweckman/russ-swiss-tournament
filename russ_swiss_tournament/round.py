@@ -105,4 +105,24 @@ class Round:
                 player_ids.add(p)
         return player_ids
 
+    def write_csv(
+            self,
+            path,
+        ):
+        with open(path / f"round{self.index}.csv", 'w', newline='') as csv_file:
+            round_writer = csv.writer(csv_file, delimiter=',', quotechar='"')
+            header_row = ["white", "score_white", "black", "score_black"]
+            round_writer.writerow(header_row)
+            # TODO: add support for writing full name not just id
+            rows = []
+            for m in self.matchups:
+                row = [
+                    m.res[Color.W].id,
+                    match_result_score_map[m.res[Color.W].res],
+                    m.res[Color.B].id,
+                    match_result_score_map[m.res[Color.B].res],
+                ]
+                rows.append(row)
+            round_writer.writerows(rows)
+
 

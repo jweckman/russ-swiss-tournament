@@ -17,17 +17,25 @@ def harkness_model_scores_player_wins(rounds, player_ids):
     # player_id_model_scores
     pms = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
     # wins by player
-    wbp = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
+    wbp = dict(zip(list(player_ids), [dict() for i in range(len(player_ids))]))
     for r in rounds:
         for m in r.matchups:
+            is_walkover = {m.res[Color.W].res, m.res[Color.B].res} == {MatchResult.WIN, MatchResult.WALKOVER}
             winner_loser_colors = m.get_winner_loser_colors()
 
             if winner_loser_colors:
-                wbp[m.res[winner_loser_colors[0]].id].append(m.res[winner_loser_colors[1]].id)
-            if ({m.res[Color.W].res, m.res[Color.B].res} == {MatchResult.WIN, MatchResult.WALKOVER}
+                if is_walkover:
+                    wbp[m.res[winner_loser_colors[0]].id][m.res[winner_loser_colors[1]].id] = res_valuation[
+                        MatchResult.WALKOVER
+                    ]
+                else:
+                    wbp[m.res[winner_loser_colors[0]].id][m.res[winner_loser_colors[1]].id] = res_valuation[
+                        m.res[winner_loser_colors[0]].res
+                    ]
+            if ( is_walkover
                     and winner_loser_colors ):
-                pms[m.res[winner_loser_colors[0]].id] = res_valuation[m.res[winner_loser_colors[1]].res]
-                pms[m.res[winner_loser_colors[1]].id] = 0
+                pms[m.res[winner_loser_colors[0]].id].append(res_valuation[m.res[winner_loser_colors[1]].res])
+                pms[m.res[winner_loser_colors[1]].id].append(0)
             else:
                 pms[m.res[Color.W].id].append(res_valuation[m.res[Color.W].res])
                 pms[m.res[Color.B].id].append(res_valuation[m.res[Color.B].res])
@@ -48,8 +56,8 @@ def calc_harkness(rounds:list[Round], player_ids: set):
 
     nine_or_more_rounds = len(rounds) > 8
     for player, defeated_players in wins_by_player.items():
-        for dp in defeated_players:
-            player_total_gains[player].append(player_model_scores[dp])
+        for dp, factor in defeated_players.items():
+            player_total_gains[player].append(player_model_scores[dp] * factor)
 
     res = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
     for player, scores in player_total_gains.items():

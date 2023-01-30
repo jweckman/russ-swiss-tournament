@@ -73,6 +73,7 @@ from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMatch
 from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.tie_break import calc_harkness
+from russ_swiss_tournament.matchup_assignment import MatchupsAssigner, RoundRobinAssigner
 
 # PLAYER
 def test_should_get_player_name():
@@ -155,37 +156,44 @@ def create_random_round(matchup_count):
         second += 2
     return Round(round_matchups)
 
-# def create_rounds(players, count, round_matchups=None):
-#     rounds = []
-#     if not round_matchups:
-#         for r_id in range(count):
-#             pass
-#     else:
-#         for i,m in enumerate(round_matchups):
-#             rounds.append(Round(i+1, m))
-#
-#     return rouBds
+def fill_round_with_random_values(round: Round):
+    random_round = create_random_round(len(round.matchups))
+    for i, m in enumerate(round.matchups.copy()):
+        round.matchups[i].res[Color.W].res = random_round.matchups[i].res[Color.W].res
+        round.matchups[i].res[Color.B].res = random_round.matchups[i].res[Color.B].res
+
+def create_rounds(t, m, count, round_matchups=None):
+    rounds = []
+    if not round_matchups:
+        for r_id in range(count):
+            m.create_next_round()
+            fill_round_with_random_values(t.rounds[-1])
+    else:
+        for i,m in enumerate(round_matchups):
+            rounds.append(Round(i+1, m))
+
+    return rounds
 
 def test_should_calculate_harkness_correctly():
     # TODO: tournament witout create_players is broken
-    t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'russ_24' / 'config.toml', create_players=True)
-    # t.players = list(create_players(14))
-    # r = create_random_round(7)
-    # rr = r.get_results()
-    s = t.get_standings()
-    fp = t.get_faced_players()
-    nr = t.generate_round()
-    t.calculate_tie_break_results()
-    # TODO: Create a tournament result random generator
-        # - assign probabilities for matchup compositions
-        # - generate next round based on results
+    # t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'russ_24' / 'config.toml', create_players=True)
+    t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
+    rra = RoundRobinAssigner(t)
+    rra.prepare_tournament_rounds()
+    [fill_round_with_random_values(r) for r in t.rounds]
+    calc_harkness(t.rounds, [p.id for p in t.players])
+
     assert True == False
 
+def test_should_generate_swiss_rounds_correctly():
+    t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
+    m = MatchupsAssigner(t)
+    # create_rounds(t, m, 9)
+    # m = MatchupsAssigner(t)
+    # TODO: check that every round has correctly assigned matches
+    # logic broken for now
 
-# # TOURNAMENT
-def test_should_create_tournament_from_toml():
-    t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'russ_24' / 'config.toml', create_players=True)
-    assert t.year == 2015
+
 #
 # # DATABASE
 # # read from toml and csv

@@ -7,7 +7,8 @@ from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMatch
 from russ_swiss_tournament import tie_break
-from russ_swiss_tournament.service import pairwise
+from russ_swiss_tournament.service import pairwise, split_list
+
 
 class Tournament:
     '''player list should be sorted by ranking before start of tournament'''
@@ -20,6 +21,7 @@ class Tournament:
             year: int,
             count: int,
             create_players: bool = False,
+            folder: Path | None = None,
         ):
         self.players = players
         self.rounds = rounds
@@ -27,16 +29,17 @@ class Tournament:
         self.used_tie_break = used_tie_break
         self.year = year
         self.count = count
+        self.folder = folder
 
     def __repr__(self):
         return pprint.pformat([[m.res for m in r.matchups] for r in self.rounds], indent=4)
 
     @classmethod
     def create_players(cls, ids, first_names = None, last_names = None):
-        players = set()
+        players = []
         if ids and not all([first_names, last_names]):
             for i, id in enumerate(ids):
-                players.add(Player(id, f"p{i}f", f"p{i}l"))
+                players.append(Player(id, f"p{i}f", f"p{i}l"))
         else:
             # TODO: allow creating based on names as well
             pass
@@ -59,7 +62,7 @@ class Tournament:
             config = tomli.load(fp)
 
         rounds = []
-        player_ids = set(config['players']['ids'])
+        player_ids = config['players']['ids']
         if create_players:
             players = cls.create_players(player_ids)
         if read_rounds:
@@ -72,6 +75,7 @@ class Tournament:
             used_tie_break = getattr(tie_break.TieBreakMethod, config['general']['tie_break_method'].upper()),
             year = config['general']['year'],
             count = config['general']['count'],
+            folder = Path().cwd() / 'tournaments' / config['general']['folder'],
         )
 
     def calculate_tie_break_results(self):
@@ -134,83 +138,14 @@ class Tournament:
                         f"Round {r.index} containes unset results, aborting new round generation"
                     )
 
-    def generate_round(self):
-        if not self.rounds:
-            self._create_initial_round()
-        else:
-            self.validate_no_null_match_results_in_rounds()
-            self._create_next_round()
-
     def _create_initial_round(self):
-        # TODO: initial round generation
-        pass
-
-    def _assign_matchup_colors(self, higher: int, lower: int) -> tuple[int,int]:
-        player_color_counts = self.get_player_color_counts()
-        h_colors = player_color_counts[higher]
-        l_colors = player_color_counts[lower]
-        white_diff = h_colors[0] - l_colors[0]
-        black_diff = h_colors[1] - l_colors[1]
-        if white_diff != 0:
-            if white_diff > 0:
-                white = lower
-                black = higher
-            elif white_diff < 0:
-                black = lower
-                white = higher
-        elif black_diff != 0:
-            if black_diff > 0:
-                black = higher
-                white = lower
-            elif black_diff < 0:
-                black = lower
-                white = higher
-        else:
-            player_ids_by_rank = [p.id for p in self.players]
-            higher_rank_index = player_ids_by_rank.index(higher)
-            lower_rank_index = player_ids_by_rank.index(lower)
-            if higher_rank_index < lower_rank_index:
-                white = lower
-                black = higher
-            else:
-                white = higher
-                black = lower
-
-        return white, black
-
-    def _assign_round_colors(self) -> list[tuple[int,int]]:
-        '''
-        Returns list of player ids white, black
-        TODO: Only works for even player count
-        '''
-        faced_players = self.get_faced_players()
-        players_standing_sort = list(reversed(
-            {k: v for k, v in sorted(self.get_standings().items(), key=lambda item: item[1])}.keys()
-        ))
-        results = []
-        already_paired = set()
-        def _find_matchup_pair():
-            if len(players_standing_sort) == 0:
-                return
-            higher = players_standing_sort[0]
-            for p in players_standing_sort[1:]:
-                if p not in (already_paired | set(faced_players[higher])):
-                    lower = p
-                    break
-            white, black = self._assign_matchup_colors(higher, lower)
-            results.append((white, black))
-            already_paired.add(players_standing_sort.pop(players_standing_sort.index(white)))
-            already_paired.add(players_standing_sort.pop(players_standing_sort.index(black)))
-            _find_matchup_pair()
-        _find_matchup_pair()
-        return results
-
-    def _create_next_round(self):
-        matchup_colors = self._assign_round_colors()
+        # Players list should already be orderd by rank
+        player_ids = [p.id for p in self.players]
+        middle_index=len(player_ids)//2
+        first, second = split_list(player_ids, middle_index)
         matchups = []
-        for mcs in matchup_colors:
-            matchups.append(Matchup({Color.W: PlayerMatch(mcs[0]), Color.B: PlayerMatch(mcs[1])}))
-        self.rounds.append(
-            Round(matchups, index = self.rounds[-1].index + 1)
-        )
+        for i, p in enumerate(first):
+            matchups.append(Matchup({Color.W: PlayerMatch(second[i]),Color.B: PlayerMatch(p)}))
+        self.rounds.append(Round(matchups, index = 1))
+
 
