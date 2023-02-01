@@ -2,6 +2,7 @@ import itertools
 import csv
 from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMatch
 from russ_swiss_tournament.player import Player
+from russ_swiss_tournament.db import Database
 
 
 match_result_manual_map = {
@@ -108,7 +109,9 @@ class Round:
     def write_csv(
             self,
             path,
+            db: Database | None = None,
         ):
+        '''Path refers to a folder. File names are automated based on round index'''
         with open(path / f"round{self.index}.csv", 'w', newline='') as csv_file:
             round_writer = csv.writer(csv_file, delimiter=',', quotechar='"')
             header_row = ["white", "score_white", "black", "score_black"]
@@ -116,10 +119,16 @@ class Round:
             # TODO: add support for writing full name not just id
             rows = []
             for m in self.matchups:
+                if db:
+                    white = db.get_player_by_id(m.res[Color.W].id).get_full_name()
+                    black = db.get_player_by_id(m.res[Color.B].id).get_full_name()
+                else:
+                    white = m.res[Color.W].id
+                    black = m.res[Color.B].id
                 row = [
-                    m.res[Color.W].id,
+                    white,
                     match_result_score_map[m.res[Color.W].res],
-                    m.res[Color.B].id,
+                    black,
                     match_result_score_map[m.res[Color.B].res],
                 ]
                 rows.append(row)

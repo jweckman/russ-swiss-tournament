@@ -57,7 +57,7 @@ class Tournament:
         return rounds
 
     @classmethod
-    def from_toml(cls, path, read_rounds = True, create_players = False):
+    def from_toml(cls, path, read_rounds = True, create_players = False, db = None):
         with open(path, mode="rb") as fp:
             config = tomli.load(fp)
 
@@ -65,6 +65,9 @@ class Tournament:
         player_ids = config['players']['ids']
         if create_players:
             players = cls.create_players(player_ids)
+        elif db:
+            players = [db.get_player_by_id(pid) for pid in player_ids]
+            breakpoint()
         if read_rounds:
             rounds = cls.read_rounds(path, players)
 
@@ -79,12 +82,12 @@ class Tournament:
         )
 
     def calculate_tie_break_results(self):
-        self.tie_break_results[tie_break.TieBreakMethod.HARKNESS] = tie_break.calc_harkness(
+        self.tie_break_results[tie_break.TieBreakMethod.MODIFIED_MEDIAN] = tie_break.calc_modified_median_solkoff(
             self.rounds,
             [p.id for p in self.players]
         )
 
-    def get_faced_players(self, until: str | int ='latest') -> dict[int,list[int]]:
+    def get_opponents(self, until: str | int ='latest') -> dict[int,list[int]]:
         # TODO: add validation if faced twice
         player_ids = [p.id for p in self.players]
         if until == 'latest':

@@ -28,6 +28,6 @@ ids = [
 year = 2023
 count = 23
 rounds = 9
-tie_break_method = "harkness"
+tie_break_method = "modified_median"
 folder = "dummy"
 

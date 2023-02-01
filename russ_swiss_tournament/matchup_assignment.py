@@ -9,7 +9,7 @@ class MatchupsAssigner:
             tournament,
         ):
         self.tournament = tournament
-        self.faced_players: dict[int,list[int]] = tournament.get_faced_players()
+        self.opponents: dict[int,list[int]] = tournament.get_opponents()
         self.players_standing_sort: list | None = None
         self.matchup_colors: list[tuple[int,int]] = []
         self.already_paired: set = set()
@@ -63,7 +63,7 @@ class MatchupsAssigner:
                 "Uneven number of participants is currently not supported"
             )
 
-        faced_players = self.tournament.get_faced_players()
+        opponents = self.tournament.get_opponents()
         self.players_standing_sort = list(reversed(
             {k: v for k, v in sorted(self.tournament.get_standings().items(), key=lambda item: item[1])}.keys()
         ))
@@ -74,7 +74,7 @@ class MatchupsAssigner:
                 return True
             higher = self.players_standing_sort[0]
             for p in self.players_standing_sort[1:]:
-                if p not in (self.already_paired | set(faced_players[higher])):
+                if p not in (self.already_paired | set(opponents[higher])):
                     self._assign_matchup_colors_to_res(
                         higher,
                         p
@@ -185,7 +185,7 @@ class RoundRobinAssigner:
         '''
         self.create_berger_rounds()
         brpid = self.replace_berger_ranks_with_player_ids()
-        for round in brpid:
+        for i, round in enumerate(brpid):
             round_matchups = []
             for matchup_player_ids in round:
                 round_matchups.append(Matchup(
@@ -194,5 +194,5 @@ class RoundRobinAssigner:
                         Color.B: PlayerMatch(matchup_player_ids[1])
                     }
                 ))
-            self.tournament.rounds.append(Round(round_matchups))
+            self.tournament.rounds.append(Round(round_matchups, i+1))
 

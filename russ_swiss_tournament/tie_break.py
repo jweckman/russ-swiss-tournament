@@ -4,69 +4,75 @@ from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.matchup import MatchResult, Color, PlayerMatch
 
 class TieBreakMethod(Enum):
-    HARKNESS = 1
+    MODIFIED_MEDIAN = 1
+    SOLKOFF = 2
 
-def harkness_model_scores_player_wins(rounds, player_ids):
+def modified_median_solkoff_model_scores(rounds, player_ids):
     res_valuation = {
         MatchResult.WIN: 1,
         MatchResult.LOSS: 0,
-        MatchResult.DRAW: 0,
+        MatchResult.DRAW: 0.5,
         MatchResult.UNSET: 0,
         MatchResult.WALKOVER: 0.5,
     }
-    # player_id_model_scores
-    pms = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
-    # wins by player
-    wbp = dict(zip(list(player_ids), [dict() for i in range(len(player_ids))]))
+    pms = dict(zip(list(player_ids), [0 for x in range(len(player_ids))]))
     for r in rounds:
         for m in r.matchups:
-            is_walkover = {m.res[Color.W].res, m.res[Color.B].res} == {MatchResult.WIN, MatchResult.WALKOVER}
-            winner_loser_colors = m.get_winner_loser_colors()
-
+            winner_loser_colors, is_walkover = m.get_winner_loser_colors()
             if winner_loser_colors:
-                if is_walkover:
-                    wbp[m.res[winner_loser_colors[0]].id][m.res[winner_loser_colors[1]].id] = res_valuation[
-                        MatchResult.WALKOVER
-                    ]
-                else:
-                    wbp[m.res[winner_loser_colors[0]].id][m.res[winner_loser_colors[1]].id] = res_valuation[
-                        m.res[winner_loser_colors[0]].res
-                    ]
-            if ( is_walkover
-                    and winner_loser_colors ):
-                pms[m.res[winner_loser_colors[0]].id].append(res_valuation[m.res[winner_loser_colors[1]].res])
-                pms[m.res[winner_loser_colors[1]].id].append(0)
+                winner_color, loser_color = winner_loser_colors
+
+            if is_walkover:
+                pms[m.res[winner_color].id] += res_valuation[
+                    MatchResult.WALKOVER
+                ]
+                pms[m.res[loser_color].id] += res_valuation[
+                    MatchResult.LOSS
+                ]
             else:
-                pms[m.res[Color.W].id].append(res_valuation[m.res[Color.W].res])
-                pms[m.res[Color.B].id].append(res_valuation[m.res[Color.B].res])
+                for color, player_match in m.res.items():
+                    pms[player_match.id] += res_valuation[player_match.res]
 
-    pms = {k:(sum(v) or 0) for k,v in pms.items()}
-    return pms, wbp
+    return pms
 
-def calc_harkness(rounds:list[Round], player_ids: set):
+def calc_modified_median_solkoff(rounds:list[Round], player_ids: set, opponents: dict):
     '''
     First calculate model scores for each player.
-    Then populate a wins by player with which players have been won against.
-    Sum scores of wins, removing top and bottom values depending on round count.
-    Real rules arbitrarily only kick in after 5 rounds and up (makes testing easier)
+    Solkoff is actually Modified Median without filtering
     '''
-    player_model_scores, wins_by_player = harkness_model_scores_player_wins(rounds, player_ids)
+    player_model_scores = modified_median_solkoff_model_scores(rounds, player_ids)
 
     player_total_gains = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
 
+    for player, ops in opponents.items():
+        for opponent in ops:
+            player_total_gains[player].append(player_model_scores[opponent])
+
     nine_or_more_rounds = len(rounds) > 8
-    for player, defeated_players in wins_by_player.items():
-        for dp, factor in defeated_players.items():
-            player_total_gains[player].append(player_model_scores[dp] * factor)
-
-    res = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
+    modified_median = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
+    solkoff = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
+    tournament_max_score = len(rounds)
+    tournament_half_score = tournament_max_score / 2
     for player, scores in player_total_gains.items():
-        if len(rounds) > 4:
-            scores.pop(scores.index(max(scores)))
-            scores.pop(scores.index(min(scores)))
-            if nine_or_more_rounds:
-                scores.pop(scores.index(max(scores)))
-                scores.pop(scores.index(min(scores)))
-        res[player] = sum(scores)
+        player_score = player_model_scores[player]
 
-    return res
+        mod_med_scores = scores.copy()
+        if player_score > tournament_half_score:
+            mod_med_scores.pop(mod_med_scores.index(min(mod_med_scores)))
+            if nine_or_more_rounds:
+                mod_med_scores.pop(mod_med_scores.index(min(mod_med_scores)))
+        elif player_score < tournament_half_score:
+            mod_med_scores.pop(mod_med_scores.index(max(mod_med_scores)))
+            if nine_or_more_rounds:
+                mod_med_scores.pop(mod_med_scores.index(max(mod_med_scores)))
+        else:
+            mod_med_scores.pop(mod_med_scores.index(max(mod_med_scores)))
+            mod_med_scores.pop(mod_med_scores.index(min(mod_med_scores)))
+            if nine_or_more_rounds:
+                mod_med_scores.pop(mod_med_scores.index(max(mod_med_scores)))
+                mod_med_scores.pop(mod_med_scores.index(min(mod_med_scores)))
+
+        modified_median[player] = sum(mod_med_scores)
+        solkoff[player] = sum(scores)
+
+    return modified_median, solkoff
