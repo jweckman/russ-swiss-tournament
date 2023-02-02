@@ -28,6 +28,14 @@ match_result_score_map = {
     MatchResult.WALKOVER: 0,
 }
 
+match_result_score_text_map = {
+    MatchResult.WIN:  1,
+    MatchResult.LOSS: 0,
+    MatchResult.DRAW: 0.5,
+    MatchResult.UNSET: None,
+    MatchResult.WALKOVER: 'wo',
+}
+
 class Round:
     '''Note: index var starts from 1 to match with csv file names'''
     id_iter = itertools.count()
@@ -80,16 +88,6 @@ class Round:
                 matchups.append(matchup)
         return cls(matchups, index)
 
-    @classmethod
-    def create_initial(self):
-        # TODO initial round gen
-        pass
-
-    @classmethod
-    def create_next(self, standings):
-        prs = prev_round.get_results()
-        pass
-
     def get_results(self) -> dict[int,float]:
         player_ids = self.get_player_ids()
         results = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
@@ -127,9 +125,9 @@ class Round:
                     black = m.res[Color.B].id
                 row = [
                     white,
-                    match_result_score_map[m.res[Color.W].res],
+                    match_result_score_text_map[m.res[Color.W].res],
                     black,
-                    match_result_score_map[m.res[Color.B].res],
+                    match_result_score_text_map[m.res[Color.B].res],
                 ]
                 rows.append(row)
             round_writer.writerows(rows)

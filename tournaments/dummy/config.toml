@@ -1,4 +1,19 @@
-title = "Dummy"
+[general]
+title = "Tournament Name"
+year = 2023
+count = 23
+rounds = 9
+round_system = "berger"
+tie_break_methods_swiss =  [
+  "modified_median",
+  "solkoff"
+]
+tie_break_methods_round_robin = [
+  "sonneborn_berger",
+  "koya"
+]
+folder = "dummy"
+round_folder = "testing_rounds_round_robin"
 
 [management]
 coordinator = "Dummy"
@@ -23,11 +38,4 @@ ids = [
   13,
   14
 ]
-
-[general]
-year = 2023
-count = 23
-rounds = 9
-tie_break_method = "modified_median"
-folder = "dummy"
 
