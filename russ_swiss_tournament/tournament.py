@@ -2,6 +2,7 @@ import tomli
 from pathlib import Path
 from collections import Counter
 import pprint
+from enum import Enum
 
 from russ_swiss_tournament.round import Round, match_result_score_map
 from russ_swiss_tournament.player import Player
@@ -9,6 +10,14 @@ from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMat
 from russ_swiss_tournament import tie_break
 from russ_swiss_tournament.service import pairwise, split_list
 
+class RoundSystem(Enum):
+    SWISS = 1
+    BERGER = 2
+
+round_system_tie_break_map = {
+    RoundSystem.SWISS: tie_break.TieBreakMethodSwiss,
+    RoundSystem.BERGER: tie_break.TieBreakMethodRoundRobin,
+}
 
 class Tournament:
     '''player list should be sorted by ranking before start of tournament'''
@@ -16,6 +25,7 @@ class Tournament:
             self,
             players: list[Player],
             rounds: list[Round],
+            round_system: RoundSystem,
             tie_break_results_swiss: dict[tie_break.TieBreakMethodSwiss, dict],
             tie_break_results_round_robin: dict[tie_break.TieBreakMethodRoundRobin, dict],
             year: int,
@@ -26,6 +36,7 @@ class Tournament:
         ):
         self.players = players
         self.rounds = rounds
+        self.round_system = round_system
         self.tie_break_results_swiss = tie_break_results_swiss
         self.tie_break_results_round_robin = tie_break_results_round_robin
         self.year = year
@@ -59,7 +70,13 @@ class Tournament:
         return rounds
 
     @classmethod
-    def from_toml(cls, path, read_rounds = True, create_players = False, db = None):
+    def from_toml(
+            cls,
+            path,
+            read_rounds = True,
+            create_players = False,
+            db = None
+        ):
         with open(path, mode="rb") as fp:
             config = tomli.load(fp)
         round_path = Path().cwd() / 'tournaments' / config['general']['folder'] / config['general']['round_folder']
@@ -81,10 +98,12 @@ class Tournament:
                 f"{', '.join([x.name.lower() for x in tie_break.TieBreakMethodSwiss])}"
                 f", {', '.join([x.name.lower() for x in tie_break.TieBreakMethodRoundRobin])}"
             ) from e
+        rs = getattr(RoundSystem, config['general']['round_system'].upper())
 
         return cls(
             players = players,
             rounds = rounds,
+            round_system = rs,
             tie_break_results_swiss = {x: None for x in used_swiss},
             tie_break_results_round_robin = {x: None for x in used_round_robin},
             year = config['general']['year'],

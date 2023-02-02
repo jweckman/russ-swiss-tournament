@@ -4,7 +4,6 @@ from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMat
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.db import Database
 
-
 match_result_manual_map = {
     1: MatchResult.WIN,
     '1': MatchResult.WIN,
