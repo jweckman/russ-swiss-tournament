@@ -1,6 +1,7 @@
 from russ_swiss_tournament.tournament import Tournament
-from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMatch
+from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.round import Round
+from russ_swiss_tournament.service import MatchResult, Color
 
 class MatchupsAssigner:
     '''Matchup colors is main result we want to generate. Following round is generated based on it'''
@@ -188,10 +189,11 @@ class RoundRobinAssigner:
         for i, round in enumerate(brpid):
             round_matchups = []
             for matchup_player_ids in round:
+                # TODO: add player id validation
                 round_matchups.append(Matchup(
                     {
-                        Color.W: PlayerMatch(matchup_player_ids[0]),
-                        Color.B: PlayerMatch(matchup_player_ids[1])
+                        Color.W: [PlayerMatch(p) for p in self.tournament.players if p.id == matchup_player_ids[0]][0],
+                        Color.B: [PlayerMatch(p) for p in self.tournament.players if p.id == matchup_player_ids[1]][0],
                     }
                 ))
             self.tournament.rounds.append(Round(round_matchups, i+1))

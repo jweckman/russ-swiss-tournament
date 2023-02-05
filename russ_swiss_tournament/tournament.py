@@ -6,9 +6,9 @@ from enum import Enum
 
 from russ_swiss_tournament.round import Round, match_result_score_map
 from russ_swiss_tournament.player import Player
-from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMatch
+from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament import tie_break
-from russ_swiss_tournament.service import pairwise, split_list
+from russ_swiss_tournament.service import MatchResult, Color, pairwise, split_list
 
 class RoundSystem(Enum):
     SWISS = 1
@@ -123,7 +123,7 @@ class Tournament:
 
     def calculate_tie_break_results_round_robin(self):
         sonne, koya = tie_break.calc_sonne_koya(
-            self.get_player_defeated_drawn(),
+            *self.get_player_defeated_drawn(),
             self.get_standings(),
             len(self.rounds),
         )
@@ -140,8 +140,8 @@ class Tournament:
         results = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
         for r in self.rounds[:index]:
             for m in r.matchups:
-                results[m.res[Color.W].id].append(m.res[Color.B].id)
-                results[m.res[Color.B].id].append(m.res[Color.W].id)
+                results[m.res[Color.W].player.id].append(m.res[Color.B].id)
+                results[m.res[Color.B].player.id].append(m.res[Color.W].id)
         return results
 
     def get_player_defeated_drawn(self) -> (dict[int,list[list,list]], dict[int,dict[int,float]]):
@@ -159,15 +159,15 @@ class Tournament:
                 score_white = match_result_score_map[m.res[Color.W].res]
                 score_black = match_result_score_map[m.res[Color.B].res]
                 if score_white == 1:
-                    pdd[m.res[Color.W].id][0].append(m.res[Color.B].id)
+                    pdd[m.res[Color.W].player.id][0].append(m.res[Color.B].player.id)
                 if score_white == 0.5:
-                    pdd[m.res[Color.W].id][1].append(m.res[Color.B].id)
-                pdd_scores[m.res[Color.W].id][m.res[Color.B].id] = score_white
+                    pdd[m.res[Color.W].player.id][1].append(m.res[Color.B].player.id)
+                pdd_scores[m.res[Color.W].player.id][m.res[Color.B].player.id] = score_white
                 if score_black == 1:
-                    pdd[m.res[Color.B].id][0].append(m.res[Color.W].id)
+                    pdd[m.res[Color.B].player.id][0].append(m.res[Color.W].player.id)
                 if score_white == 0.5:
-                    pdd[m.res[Color.B].id][1].append(m.res[Color.W].id)
-                pdd_scores[m.res[Color.B].id][m.res[Color.W].id] = score_black
+                    pdd[m.res[Color.B].player.id][1].append(m.res[Color.W].player.id)
+                pdd_scores[m.res[Color.B].player.id][m.res[Color.W].player.id] = score_black
         return pdd, pdd_scores
 
 
@@ -181,13 +181,14 @@ class Tournament:
         # TODO: handle walkover not counting
         for r in self.rounds[:index]:
             for m in r.matchups:
-                results[m.res[Color.W].id][0] += 1
-                results[m.res[Color.B].id][1] += 1
+                results[m.res[Color.W].player.id][0] += 1
+                results[m.res[Color.B].player.id][1] += 1
         return results
 
     def get_standings(self, until: str | int ='latest') -> dict[int,float] | None:
         '''
         Get entire tournament standings until chosen round. Defaults to latest results.
+        Ascending sort of result dictionary.
         Round index is 1 based
         '''
         if until == 'latest':
@@ -196,11 +197,16 @@ class Tournament:
             index = until
         res = None
         used_rounds = self.rounds[:index]
+        # TODO fix recursion error with tie break inside get_standings()
+        # self.calculate_tie_break_results_round_robin()
+        # self.calculate_tie_break_results_swiss()
+        # TODO sort by standings and tie break
         for i, r in enumerate(used_rounds):
             if i == 0:
                 res = r.get_results()
             else:
                 res = dict(Counter(res)+Counter(r.get_results()))
+        res = {k: v for k, v in sorted(res.items(), key=lambda item: item[1], reverse=True)}
         return res
 
     def validate_no_null_match_results_in_rounds(self):
@@ -213,9 +219,8 @@ class Tournament:
 
     def _create_initial_round(self):
         # Players list should already be orderd by rank
-        player_ids = [p.id for p in self.players]
-        middle_index=len(player_ids)//2
-        first, second = split_list(player_ids, middle_index)
+        middle_index=len(self.players)//2
+        first, second = split_list(self.players.copy(), middle_index)
         matchups = []
         for i, p in enumerate(first):
             matchups.append(Matchup({Color.W: PlayerMatch(second[i]),Color.B: PlayerMatch(p)}))

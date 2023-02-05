@@ -2,20 +2,13 @@ from enum import Enum
 from dataclasses import dataclass
 import itertools
 
-class MatchResult(Enum):
-    WIN = 1
-    LOSS = 2
-    DRAW = 3
-    UNSET = 4
-    WALKOVER = 5
+from russ_swiss_tournament.player import Player
+from russ_swiss_tournament.service import  MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
 
-class Color(Enum):
-    W = 1
-    B = 2
 
 @dataclass
 class PlayerMatch:
-    id: int
+    player: Player
     res: MatchResult = MatchResult.UNSET
 
 class Matchup:
@@ -35,6 +28,19 @@ class Matchup:
     def res(self, value):
         self.validate_result(value)
         self._res = value
+
+    def __str__(self):
+        white = self.res[Color.W]
+        black = self.res[Color.B]
+        white_name = white.player.get_full_name() or white.player.id
+        black_name = black.player.get_full_name() or white.player.id
+        res_white = match_result_score_text_map[white.res]
+        res_black = match_result_score_text_map[black.res]
+        w = f"{white_name.ljust(20)} {str(res_white).ljust(2)}"
+        b = f"{black_name.ljust(20)} {str(res_black).ljust(2)}"
+        res = f"{w} -    {b}"
+        # res = f"{white_name} {res_white} - {black_name} {res_black}"
+        return res
 
     def validate_result(self, value):
         ok = [

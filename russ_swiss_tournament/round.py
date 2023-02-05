@@ -1,8 +1,9 @@
 import itertools
 import csv
-from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMatch
+from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.db import Database
+from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
 
 match_result_manual_map = {
     1: MatchResult.WIN,
@@ -48,16 +49,14 @@ class Round:
         self.index = index
 
     @classmethod
-    def match_player(cls, s:str, players: list[Player]) -> int:
+    def match_player(cls, s:str, players: list[Player]) -> Player:
         res = None
-        try:
-            res= int(s)
-        except:
-            sanitized = s.lower().strip()
-            for p in players:
-                if p.get_full_name().lower().strip() == sanitized:
-                    res = p.id
-                    break
+        sanitized = s.lower().strip()
+        for p in players:
+            if (sanitized.isdigit() and str(p.id) == sanitized
+                    or p.get_full_name().lower().strip() == sanitized):
+                res = p
+                break
         return res
 
     @classmethod
@@ -72,17 +71,17 @@ class Round:
             round_reader = csv.reader(csv_file, delimiter=',', quotechar='"')
             headers = next(round_reader, None)
             for line in round_reader:
-                white_id = cls.match_player(line[0], players)
-                black_id = cls.match_player(line[2], players)
-                if (not all([isinstance(white_id, int), isinstance(black_id, int)])
-                        or any([pid not in [x.id for x in players] for pid in [white_id, black_id]])):
+                white_player = cls.match_player(line[0], players)
+                black_player = cls.match_player(line[2], players)
+                if not (any([white_player, black_player])
+                        or any([pid not in [x.id for x in players] for pid in [white_player.id, black_player.id]])):
                     raise ValueError(
                         f"Could not match player {line[0]} or player {line[2]} "
                         "based on id or full name. Check exact typing from database"
                     )
                 matchup = Matchup({
-                    Color.W: PlayerMatch(white_id, match_result_manual_map[line[1]]),
-                    Color.B: PlayerMatch(black_id, match_result_manual_map[line[3]])
+                    Color.W: PlayerMatch(white_player, match_result_manual_map[line[1]]),
+                    Color.B: PlayerMatch(black_player, match_result_manual_map[line[3]])
                 })
                 matchups.append(matchup)
         return cls(matchups, index)
@@ -91,14 +90,15 @@ class Round:
         player_ids = self.get_player_ids()
         results = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
         for m in self.matchups:
-            results[m.res[Color.W].id] = match_result_score_map[m.res[Color.W].res]
-            results[m.res[Color.B].id] = match_result_score_map[m.res[Color.B].res]
+            results[m.res[Color.W].player.id] = match_result_score_map[m.res[Color.W].res]
+            results[m.res[Color.B].player.id] = match_result_score_map[m.res[Color.B].res]
         return results
 
     def get_player_ids(self):
         player_ids = set()
         for m in self.matchups:
-            rps = [p.id for p in m.res.values()]
+            # TODO BUG IS HERE. ID still set somewhere
+            rps = [p.player.id for p in m.res.values()]
             for p in rps:
                 player_ids.add(p)
         return player_ids
@@ -117,11 +117,11 @@ class Round:
             rows = []
             for m in self.matchups:
                 if db:
-                    white = db.get_player_by_id(m.res[Color.W].id).get_full_name()
-                    black = db.get_player_by_id(m.res[Color.B].id).get_full_name()
+                    white = db.get_player_by_id(m.res[Color.W].player.id).get_full_name()
+                    black = db.get_player_by_id(m.res[Color.B].player.id).get_full_name()
                 else:
-                    white = m.res[Color.W].id
-                    black = m.res[Color.B].id
+                    white = m.res[Color.W].player.id
+                    black = m.res[Color.B].player.id
                 row = [
                     white,
                     match_result_score_text_map[m.res[Color.W].res],
@@ -130,5 +130,7 @@ class Round:
                 ]
                 rows.append(row)
             round_writer.writerows(rows)
+    def pretty_print(self):
+        res = ""
 
 

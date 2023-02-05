@@ -5,11 +5,12 @@ from random import choices, seed
 
 from russ_swiss_tournament.tournament import Tournament
 from russ_swiss_tournament.player import Player
-from russ_swiss_tournament.matchup import Matchup, MatchResult, Color, PlayerMatch
+from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.tie_break import calc_modified_median_solkoff, calc_sonne_koya
 from russ_swiss_tournament.matchup_assignment import MatchupsAssigner, RoundRobinAssigner
 from russ_swiss_tournament.db import Database
+from russ_swiss_tournament.service import MatchResult, Color
 
 # PLAYER
 def test_should_get_player_name():
@@ -19,47 +20,55 @@ def test_should_get_player_name():
 
 # MATCHUP
 def test_should_create_without_result():
-    m = Matchup({Color.W: PlayerMatch(1),Color.B: PlayerMatch(2)})
+    p1, p2 = create_players(2)
+    m = Matchup({Color.W: PlayerMatch(p1),Color.B: PlayerMatch(p2)})
     assert m.res[Color.W].res == MatchResult.UNSET
     assert m.res[Color.B].res == MatchResult.UNSET
 
 def test_should_add_result_valid():
-    m = Matchup({Color.W: PlayerMatch(1,MatchResult.UNSET),Color.B: PlayerMatch(2,MatchResult.UNSET)})
+    p1, p2 = create_players(2)
+    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
     m.add_result(MatchResult.WIN, MatchResult.LOSS)
     assert m.res[Color.B].res == MatchResult.LOSS
 
 def test_should_add_result_invalid():
-    m = Matchup({Color.W: PlayerMatch(1,MatchResult.UNSET),Color.B: PlayerMatch(2,MatchResult.UNSET)})
+    p1, p2 = create_players(2)
+    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.WIN, MatchResult.WIN)
 
 def test_should_not_add_result_invalid_single_draw():
-    m = Matchup({Color.W: PlayerMatch(1,MatchResult.UNSET),Color.B: PlayerMatch(2,MatchResult.UNSET)})
+    p1, p2 = create_players(2)
+    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.DRAW, MatchResult.LOSS)
 
 def test_should_not_add_result_invalid_multi_win():
-    m = Matchup({Color.W: PlayerMatch(1,MatchResult.UNSET),Color.B: PlayerMatch(2,MatchResult.UNSET)})
+    p1, p2 = create_players(2)
+    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.WIN, MatchResult.WIN)
 
 def test_should_not_add_result_invalid_multi_loss():
-    m = Matchup({Color.W: PlayerMatch(1,MatchResult.UNSET),Color.B: PlayerMatch(2,MatchResult.UNSET)})
+    p1, p2 = create_players(2)
+    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.LOSS, MatchResult.LOSS)
 
 def test_should_not_add_result_invalid_single_unset():
-    m = Matchup({Color.W: PlayerMatch(1,MatchResult.UNSET),Color.B: PlayerMatch(2,MatchResult.UNSET)})
+    p1, p2 = create_players(2)
+    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.LOSS, MatchResult.UNSET)
 
 # ROUND
 def test_should_create_valid_round():
-    m1 = Matchup({Color.W: PlayerMatch(1,MatchResult.WIN),Color.B: PlayerMatch(2,MatchResult.LOSS)})
-    m2 = Matchup({Color.W: PlayerMatch(3,MatchResult.LOSS),Color.B: PlayerMatch(4,MatchResult.WIN)})
-    m3 = Matchup({Color.W: PlayerMatch(5,MatchResult.WIN),Color.B: PlayerMatch(6,MatchResult.LOSS)})
-    m4 = Matchup({Color.W: PlayerMatch(7,MatchResult.LOSS),Color.B: PlayerMatch(8,MatchResult.WIN)})
-    m5 = Matchup({Color.W: PlayerMatch(9,MatchResult.DRAW),Color.B: PlayerMatch(10,MatchResult.DRAW)})
+    players = create_players(10)
+    m1 = Matchup({Color.W: PlayerMatch(players[0],MatchResult.WIN),Color.B: PlayerMatch(players[1],MatchResult.LOSS)})
+    m2 = Matchup({Color.W: PlayerMatch(players[2],MatchResult.LOSS),Color.B: PlayerMatch(players[3],MatchResult.WIN)})
+    m3 = Matchup({Color.W: PlayerMatch(players[4],MatchResult.WIN),Color.B: PlayerMatch(players[5],MatchResult.LOSS)})
+    m4 = Matchup({Color.W: PlayerMatch(players[6],MatchResult.LOSS),Color.B: PlayerMatch(players[7],MatchResult.WIN)})
+    m5 = Matchup({Color.W: PlayerMatch(players[8],MatchResult.DRAW),Color.B: PlayerMatch(players[9],MatchResult.DRAW)})
     matchups = [m1,m2,m3,m4,m5]
     r = Round(matchups)
     assert r.index == 1

@@ -1,7 +1,8 @@
 from enum import Enum
 
 from russ_swiss_tournament.round import Round
-from russ_swiss_tournament.matchup import MatchResult, Color, PlayerMatch
+from russ_swiss_tournament.matchup import PlayerMatch
+from russ_swiss_tournament.service import MatchResult, Color
 
 class TieBreakMethodSwiss(Enum):
     MODIFIED_MEDIAN = 1
@@ -27,15 +28,15 @@ def modified_median_solkoff_model_scores(rounds, player_ids):
                 winner_color, loser_color = winner_loser_colors
 
             if is_walkover:
-                pms[m.res[winner_color].id] += res_valuation[
+                pms[m.res[winner_color].player.id] += res_valuation[
                     MatchResult.WALKOVER
                 ]
-                pms[m.res[loser_color].id] += res_valuation[
+                pms[m.res[loser_color].player.id] += res_valuation[
                     MatchResult.LOSS
                 ]
             else:
                 for color, player_match in m.res.items():
-                    pms[player_match.id] += res_valuation[player_match.res]
+                    pms[player_match.player.id] += res_valuation[player_match.res]
 
     return pms
 
