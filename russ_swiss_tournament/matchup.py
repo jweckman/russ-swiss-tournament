@@ -39,7 +39,6 @@ class Matchup:
         w = f"{white_name.ljust(20)} {str(res_white).ljust(2)}"
         b = f"{black_name.ljust(20)} {str(res_black).ljust(2)}"
         res = f"{w} -    {b}"
-        # res = f"{white_name} {res_white} - {black_name} {res_black}"
         return res
 
     def validate_result(self, value):

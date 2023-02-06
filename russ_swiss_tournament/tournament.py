@@ -47,6 +47,21 @@ class Tournament:
     def __repr__(self):
         return pprint.pformat([[m.res for m in r.matchups] for r in self.rounds], indent=4)
 
+    @property
+    def rounds(self):
+        return self._rounds
+
+    @rounds.setter
+    def rounds(self, value):
+        for i, round in enumerate(value):
+            if not round.index == i + 1:
+                raise ValueError(
+                    "Round object indicies not in same order as tournament "
+                    "level list object. This means some part of the code is "
+                    "not respecting this ordering and should be fixed."
+                )
+        self._rounds = value
+
     @classmethod
     def create_players(cls, ids, first_names = None, last_names = None):
         players = []
@@ -66,7 +81,7 @@ class Tournament:
 
         rounds = []
         for i, f in enumerate(csv_files):
-            rounds.append(Round.read_csv(f, i, players))
+            rounds.append(Round.read_csv(f, i+1, players))
         return rounds
 
     @classmethod
@@ -114,7 +129,7 @@ class Tournament:
 
     def calculate_tie_break_results_swiss(self):
         mm, solk = tie_break.calc_modified_median_solkoff(
-            self.rounds,
+            self.rounds[:self.get_last_complete_round_index()],
             [p.id for p in self.players],
             self.get_opponents()
         )
@@ -154,7 +169,7 @@ class Tournament:
         player_ids = [p.id for p in self.players]
         pdd = dict(zip(list(player_ids), [[[],[]] for i in range(len(player_ids))]))
         pdd_scores = dict(zip(list(player_ids), [dict() for i in range(len(player_ids))]))
-        for r in self.rounds:
+        for r in self.rounds[:self.get_last_complete_round_index()]:
             for m in r.matchups:
                 score_white = match_result_score_map[m.res[Color.W].res]
                 score_black = match_result_score_map[m.res[Color.B].res]
@@ -185,14 +200,23 @@ class Tournament:
                 results[m.res[Color.B].player.id][1] += 1
         return results
 
-    def get_standings(self, until: str | int ='latest') -> dict[int,float] | None:
+    def get_standings(
+            self,
+            until: str | int = 'latest_complete'
+        ) -> dict[int,float] | None:
         '''
-        Get entire tournament standings until chosen round. Defaults to latest results.
+        Get entire tournament standings until chosen round. Defaults to latest complete results.
         Ascending sort of result dictionary.
         Round index is 1 based
         '''
         if until == 'latest':
             index = len(self.rounds)
+        elif until == 'latest_complete':
+            index = self.get_last_complete_round_index()
+            if not index:
+                raise ValueError(
+                    "No completed rounds yet, standings could not be calculated"
+                )
         else:
             index = until
         res = None
@@ -209,13 +233,21 @@ class Tournament:
         res = {k: v for k, v in sorted(res.items(), key=lambda item: item[1], reverse=True)}
         return res
 
-    def validate_no_null_match_results_in_rounds(self):
-        for r in self.rounds:
-            for mu in r.matchups:
-                if any([v.res == MatchResult.UNSET for v in mu.res.values()]):
-                    raise ValueError(
-                        f"Round {r.index} containes unset results, aborting new round generation"
-                    )
+    def validate_no_incomplete_match_results_in_rounds(self):
+        for round in self.rounds:
+            if not round.is_complete():
+                raise ValueError(
+                    f"Round {round.index} contains unset results, cannot continue."
+                )
+    def get_last_complete_round_index(self) -> int | None:
+        if not self.rounds:
+            return None
+        sorted_rounds = sorted(self.rounds, key = lambda x: x.index)
+        complete_rounds = [r for r in sorted_rounds if r.is_complete()]
+        if complete_rounds:
+            return complete_rounds[-1].index
+        else:
+            return None
 
     def _create_initial_round(self):
         # Players list should already be orderd by rank
@@ -225,4 +257,10 @@ class Tournament:
         for i, p in enumerate(first):
             matchups.append(Matchup({Color.W: PlayerMatch(second[i]),Color.B: PlayerMatch(p)}))
         self.rounds.append(Round(matchups, index = 1))
+
+    def get_player_matchups(self, player_id):
+        player_matchups = []
+        for r in self.rounds:
+            player_matchups.append(r.get_player_matchup(player_id))
+        return player_matchups
 

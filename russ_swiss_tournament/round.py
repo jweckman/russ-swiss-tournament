@@ -103,6 +103,12 @@ class Round:
                 player_ids.add(p)
         return player_ids
 
+    def get_player_matchup(self, player_id):
+        for m in self.matchups:
+            player_ids = [pm.player.id for pm in m.res.values()]
+            if player_id in player_ids:
+                return m
+
     def write_csv(
             self,
             path,
@@ -113,7 +119,6 @@ class Round:
             round_writer = csv.writer(csv_file, delimiter=',', quotechar='"')
             header_row = ["white", "score_white", "black", "score_black"]
             round_writer.writerow(header_row)
-            # TODO: add support for writing full name not just id
             rows = []
             for m in self.matchups:
                 if db:
@@ -130,7 +135,9 @@ class Round:
                 ]
                 rows.append(row)
             round_writer.writerows(rows)
-    def pretty_print(self):
-        res = ""
 
+    def is_complete(self):
+        if any([MatchResult.UNSET in [x.res for x in v.res.values()] for v in self.matchups]):
+            return False
+        return True
 

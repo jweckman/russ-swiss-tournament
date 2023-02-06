@@ -6,42 +6,51 @@ from russ_swiss_tournament.tournament import Tournament, RoundSystem
 
 @dataclass
 class Command:
-    func: Callable
-    aliases: list
+    func: Callable | None
+    aliases: list[str]
     help: str
 
-def update(t):
-    # TODO
-    # update rounds from csv
+def update(t: Tournament):
+    t.rounds = t.read_rounds(t.round_folder, t.players)
     t.calculate_tie_break_results_round_robin()
+    # TODO calculate tie-break results
     # t.calculate_tie_break_results_swiss()
 
-def standings(t, player_id = None):
-    s = t.get_standings()
-    full_names = {p.id: p.get_full_name() for p in t.players}
-    tie_breaks = t.tie_break_results_round_robin
-    for k,v in s.items():
-        n = full_names[k]
-        if isinstance(v, float):
-            if v.is_integer():
-                v = int(v)
-        res = f"{n.ljust(20)} {str(v).ljust(5)} ("
-        for tb, trs in tie_breaks.items():
-            res = f"{res}{str(trs[k])}, "
-        res = res[:-2] + ")"
-        print(res)
+def standings(t: Tournament, player_id = None):
+    if player_id:
+        try:
+            player_id = int(player_id)
+        except:
+            print(f"ERROR: Player id must be an integer. You wrote {player_id}.")
+        pms = t.get_player_matchups(player_id)
+        [print(m) for m in pms]
+    else:
+        s = t.get_standings()
+        full_names = {p.id: p.get_full_name() for p in t.players}
+        tie_breaks = t.tie_break_results_round_robin
+        for k,v in s.items():
+            n = full_names[k]
+            if isinstance(v, float):
+                if v.is_integer():
+                    v = int(v)
+            res = f"{n.ljust(20)} {str(v).ljust(5)} ("
+            for tb, trs in tie_breaks.items():
+                res = f"{res}{str(trs[k])}, "
+            res = res[:-2] + ")"
+            print(res)
 
-def round(t, number):
+def round(t: Tournament, number):
     r_index = int(number)
     rounds = [r for r in t.rounds if r.index == r_index]
     if len(rounds) > 1:
-        raise ValidationError(
+        raise ValueError(
             "Multiple rounds have the same index. That should not happen. Check code"
         )
     if len(rounds) == 1:
         for mu in rounds[0].matchups:
             print(f"\n{mu}")
-    raise ValidationError(
+        return
+    raise ValueError(
         f"Round {number} could not be found. Is it registered? Did you type an integer?"
     )
 
@@ -50,9 +59,9 @@ cmd_update = Command(
     ['update', 'u'],
     (
         "Updates all the tournament information based on the latest inserted data.\n"
-        "This includes standings and tie-break results.\nNote that updates are only "
-        "made based on all completed consecutive rounds. Any missing round data in a round "
-        "will mean that only the previous complete rounds are included in updated calculations."
+        "This includes standings and tie-break results.\nNote that tournament results are only "
+        "updated based on all completed consecutive rounds.\nAny missing round data in a round "
+        "will mean that only the previous complete rounds are included when calculating new values."
         "\n\nShorthand command: u"
     ),
 )
@@ -63,21 +72,35 @@ cmd_standings = Command(
         "Shows the current standings. Two things to note:\n1. Run the update command first if you "
         "have any new completed rounds since the last round.\n2. Specify a player id after the command "
         "to see the player specific matchup results and other relevant standing related information."
-        "\n\nShorthand command: s (or 's %player_id%)"
+        "\n\nShorthand command: s (or 's -player_id-)"
     ),
 )
 cmd_round = Command(
     round,
     ['round', 'r'],
     (
-        "Shows the specified round, regardless of status. Note that an uncompleted round "
+        "Shows the specified round, regardless of status.\nNote that an uncompleted round "
         "that has data inserted but not updated will most likely show up as empty unless "
         "the update command is run before."
-        "\n\nShorthand command: r %num%"
+        "\n\nShorthand command: r -num-"
     ),
 )
 
-AVAILABLE_COMMANDS = [cmd_update, cmd_standings, cmd_round]
+NON_HELP_COMMANDS = [cmd_update, cmd_standings, cmd_round]
+NON_HELP_COMMANDS_PRINT = '\n'.join([', '.join(c.aliases) for c in NON_HELP_COMMANDS])
+
+GENERAL_HELP = (
+        f"Available commands:\n\n{NON_HELP_COMMANDS_PRINT}\n\n"
+        "To see help details of a specific command, type: h -command-"
+)
+
+cmd_help = Command(
+    None,
+    ['help', 'h'],
+    GENERAL_HELP
+)
+
+AVAILABLE_COMMANDS = [cmd_update, cmd_standings, cmd_round, cmd_help]
 
 def _get_init_text(t: Tournament):
 
@@ -87,13 +110,13 @@ def _get_init_text(t: Tournament):
         "information such as used round system and tie break methods."
     )
     TOML_NOTES = (
-        "Toml file parsed successfully.\nKeep in mind that payer ids need "
+        "Toml file parsed successfully.\nKeep in mind that player ids need "
         "to be added in the starting ranking order of the tournament.\n"
     )
     STATE_INFO_ROUND_ROBIN = (
         f"Tournament initialized with {len(t.rounds)} {t.round_system.name.lower()} rounds "
-        f"generated with {len(t.players)} players.\nCsv score input files are ready in "
-        f"{t.round_folder}\n\n To proceed, fill in the round files chronologically "
+        f"generated with {len(t.players)} players.\nCsv score input files are ready in:\n"
+        f"{t.round_folder}\n\nTo proceed, fill in the round files chronologically "
         "and follow up by using the 'update' and 'standings' commands."
     )
     STATE_INFO_SWISS = (
@@ -122,54 +145,44 @@ def _get_init_text(t: Tournament):
 def _normalize_input_str(s):
     return s.lower().strip()
 
-def _get_command(t: Tournament, s: str, run: bool=True):
+def _get_command(t: Tournament, s: str, help: bool = False):
     '''
-    Run boolean determines whether command is run or help string is printed.
+    Help boolean determines whether command is run or help string is printed.
     '''
-    s = s.replace('help', '')
     parts = s.split()
     for i, p in enumerate(parts):
         for c in AVAILABLE_COMMANDS:
             if any(a == p for a in c.aliases):
-                if run:
-                    arg_count = c.func.__code__.co_argcount
-                    args = None
-                    args = [a for a in parts[i+1:]]
-                    if args:
-                        res = c.func(t, *args)
-                    else:
-                        res = c.func(t)
-                else:
+                if help:
                     print(c.help)
+                    return
+                if not c.func:
+                    if len(parts) == 1:
+                        print(c.help)
+                        return
+                    if len(parts) == 2:
+                        _get_command(t, ' '.join(parts[1:]), help=True)
+                        return
+                arg_count = c.func.__code__.co_argcount
+                args = None
+                args = [a for a in parts[i+1:]]
+                if args and len(args) == arg_count -1:
+                    res = c.func(t, *args)
+                else:
+                    res = c.func(t)
 
 def main(
         t: Tournament
     ):
     '''
-    starting up should say:
-    - what the program is
-    - mention the help command
-    - give information about current program state
-    - suggest actions
-    - inform about important toml file details
-    help menu should list available commands
-
-    needed commands(RR):
-    - [u]pdate: read latests rounds and update all other state
-    - [s]tandings: latest complete round,name[id], scores, tie-break scores in order, count black and white,
-    - [s]tandings [id]: all matchups so far, tournament ranking, points, tie break results
-    - [h]elp
-
     TODO: needed commands(Swiss):
     '''
     print(_get_init_text(t))
     t.get_standings()
     while True:
-        s = input("\nType 'h' for help: ")
+        s = input("\nType 'h' for help or type a command: ")
         s = _normalize_input_str(s)
-        if 'help' in s:
-            _get_command(t, s, False)
-        else:
-            _get_command(t, s, True)
+        print('\n')
+        _get_command(t, s)
 
 

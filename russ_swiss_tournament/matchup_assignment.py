@@ -94,7 +94,7 @@ class MatchupsAssigner:
             self.players_standing_sort = list(reversed(
                 {k: v for k, v in sorted(self.tournament.get_standings().items(), key=lambda item: item[1])}.keys()
             ))
-            self.tournament.validate_no_null_match_results_in_rounds()
+            self.tournament.validate_no_incomplete_match_results_in_rounds()
             self._assign_round_colors()
             matchups = []
             for mcs in self.matchup_colors:
