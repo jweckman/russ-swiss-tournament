@@ -15,9 +15,10 @@ def update(t: Tournament):
     t.calculate_tie_break_results_round_robin()
     # TODO calculate tie-break results
     # t.calculate_tie_break_results_swiss()
+    print('All round scores and tie-breaks updated successfully')
 
 def standings(t: Tournament, player_id = None):
-    if player_id:
+    if player_id is not None:
         try:
             player_id = int(player_id)
         except:
@@ -25,7 +26,12 @@ def standings(t: Tournament, player_id = None):
         pms = t.get_player_matchups(player_id)
         [print(m) for m in pms]
     else:
-        s = t.get_standings()
+        try:
+            s = t.get_standings()
+        except Exception as e:
+            print(f"Could not get standings, reason: {e}")
+            return
+
         full_names = {p.id: p.get_full_name() for p in t.players}
         tie_breaks = t.tie_break_results_round_robin
         for k,v in s.items():
@@ -178,7 +184,6 @@ def main(
     TODO: needed commands(Swiss):
     '''
     print(_get_init_text(t))
-    t.get_standings()
     while True:
         s = input("\nType 'h' for help or type a command: ")
         s = _normalize_input_str(s)

@@ -73,7 +73,8 @@ class Round:
             for line in round_reader:
                 white_player = cls.match_player(line[0], players)
                 black_player = cls.match_player(line[2], players)
-                if not (any([white_player, black_player])
+                if (white_player is None
+                        or black_player is None
                         or any([pid not in [x.id for x in players] for pid in [white_player.id, black_player.id]])):
                     raise ValueError(
                         f"Could not match player {line[0]} or player {line[2]} "
@@ -97,7 +98,6 @@ class Round:
     def get_player_ids(self):
         player_ids = set()
         for m in self.matchups:
-            # TODO BUG IS HERE. ID still set somewhere
             rps = [p.player.id for p in m.res.values()]
             for p in rps:
                 player_ids.add(p)

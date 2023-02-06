@@ -38,7 +38,7 @@ match_result_score_text_map = {
     MatchResult.WIN:  1,
     MatchResult.LOSS: 0,
     MatchResult.DRAW: '½',
-    MatchResult.UNSET: None,
+    MatchResult.UNSET: '~',
     MatchResult.WALKOVER: 'wo',
 }
 

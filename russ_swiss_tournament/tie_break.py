@@ -97,9 +97,11 @@ def calc_sonne_koya(
     tournament_half_score = tournament_max_score / 2
     sonne = dict(zip(list(player_standings.keys()), [0 for i in range(len(player_standings.keys()))]))
     koya = dict(zip(list(player_standings.keys()), [0 for i in range(len(player_standings.keys()))]))
+
     for p, dd in player_defeated_drawn.items():
         sonne[p] += sum([player_standings[x] or 0 for x in dd[0]])
         sonne[p] += sum([player_standings[x] * 0.5 or 0 for x in dd[1]])
+
     for p, dd in player_defeated_drawn.items():
         good_opp_scores = 0
         for def_drawn_player in dd[0] + dd[1]:

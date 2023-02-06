@@ -231,6 +231,9 @@ class Tournament:
             else:
                 res = dict(Counter(res)+Counter(r.get_results()))
         res = {k: v for k, v in sorted(res.items(), key=lambda item: item[1], reverse=True)}
+        for p in self.players:
+            if p.id not in res:
+                res[p.id] = 0
         return res
 
     def validate_no_incomplete_match_results_in_rounds(self):
