@@ -188,6 +188,9 @@ def main(
         s = input("\nType 'h' for help or type a command: ")
         s = _normalize_input_str(s)
         print('\n')
-        _get_command(t, s)
+        try:
+            _get_command(t, s)
+        except Exception as e:
+            print(f"Command failed. Reason: {e}")
 
 

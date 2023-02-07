@@ -14,7 +14,7 @@ def generate_round_robin_rounds():
     db = Database()
     db.read_players()
     t = Tournament.from_toml(
-        # Path.cwd() / 'tournaments' / 'dummy' / 'config.toml',
+        Path.cwd() / 'tournaments' / 'dummy' / 'config.toml',
         read_rounds = True,
         db=db
     )
