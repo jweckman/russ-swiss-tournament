@@ -1,6 +1,7 @@
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Callable
+import sys
 
 from russ_swiss_tournament.tournament import Tournament, RoundSystem
 
@@ -18,6 +19,7 @@ def update(t: Tournament):
     print('All round scores and tie-breaks updated successfully')
 
 def standings(t: Tournament, player_id = None):
+    t.calculate_tie_break_results_round_robin()
     if player_id is not None:
         try:
             player_id = int(player_id)
@@ -39,10 +41,15 @@ def standings(t: Tournament, player_id = None):
             if isinstance(v, float):
                 if v.is_integer():
                     v = int(v)
-            res = f"{n.ljust(20)} {str(v).ljust(5)} ("
-            for tb, trs in tie_breaks.items():
-                res = f"{res}{str(trs[k])}, "
-            res = res[:-2] + ")"
+            res = f"{n.ljust(20)} {str(v).ljust(5)}"
+            if tie_breaks:
+                res += f" ("
+                for tb, trs in tie_breaks.items():
+                    if trs:
+                        res = f"{res}{str(trs[k])}, "
+                    else:
+                        res = ""
+                res = res[:-2] + ")"
             print(res)
 
 def round(t: Tournament, number):
@@ -59,6 +66,9 @@ def round(t: Tournament, number):
     raise ValueError(
         f"Round {number} could not be found. Is it registered? Did you type an integer?"
     )
+
+def terminate(t: Tournament):
+    sys.exit()
 
 cmd_update = Command(
     update,
@@ -91,8 +101,15 @@ cmd_round = Command(
         "\n\nShorthand command: r -num-"
     ),
 )
+cmd_terminate = Command(
+    terminate,
+    ['exit', 'quit', 'terminate'],
+    (
+        "Exits the program."
+    ),
+)
 
-NON_HELP_COMMANDS = [cmd_update, cmd_standings, cmd_round]
+NON_HELP_COMMANDS = [cmd_update, cmd_standings, cmd_round, cmd_terminate]
 NON_HELP_COMMANDS_PRINT = '\n'.join([', '.join(c.aliases) for c in NON_HELP_COMMANDS])
 
 GENERAL_HELP = (
@@ -106,7 +123,7 @@ cmd_help = Command(
     GENERAL_HELP
 )
 
-AVAILABLE_COMMANDS = [cmd_update, cmd_standings, cmd_round, cmd_help]
+AVAILABLE_COMMANDS = [cmd_update, cmd_standings, cmd_round, cmd_help, cmd_terminate]
 
 def _get_init_text(t: Tournament):
 
