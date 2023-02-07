@@ -148,5 +148,5 @@ ui/yarn.lock
 ui/package-lock.json
 
 
-*.csv
+player.csv
 tournaments/russ_24
