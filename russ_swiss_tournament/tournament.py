@@ -104,9 +104,17 @@ class Tournament:
             players = [db.get_player_by_id(pid) for pid in player_ids]
         if read_rounds:
             rounds = cls.read_rounds(round_path, players)
+        swiss_tie_break = config['general'].get('tie_break_methods_swiss')
+        round_robin_tie_break = config['general'].get('tie_break_methods_round_robin')
         try:
-            used_swiss = [getattr(tie_break.TieBreakMethodSwiss, x.upper()) for x in config['general']['tie_break_methods_swiss']]
-            used_round_robin = [getattr(tie_break.TieBreakMethodRoundRobin, x.upper()) for x in config['general']['tie_break_methods_round_robin']]
+            if swiss_tie_break:
+                used_swiss = [getattr(tie_break.TieBreakMethodSwiss, x.upper()) for x in swiss_tie_break]
+            else:
+                used_swiss = []
+            if round_robin_tie_break:
+                used_round_robin = [getattr(tie_break.TieBreakMethodRoundRobin, x.upper()) for x in round_robin_tie_break]
+            else:
+                used_round_robin = []
         except AttributeError as e:
             raise AttributeError(
                 "Misspelled tie break method. Available values are: "
@@ -155,8 +163,8 @@ class Tournament:
         results = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
         for r in self.rounds[:index]:
             for m in r.matchups:
-                results[m.res[Color.W].player.id].append(m.res[Color.B].id)
-                results[m.res[Color.B].player.id].append(m.res[Color.W].id)
+                results[m.res[Color.W].player.id].append(m.res[Color.B].player.id)
+                results[m.res[Color.B].player.id].append(m.res[Color.W].player.id)
         return results
 
     def get_player_defeated_drawn(self) -> (dict[int,list[list,list]], dict[int,dict[int,float]]):

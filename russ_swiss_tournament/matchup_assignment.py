@@ -3,7 +3,7 @@ from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.service import MatchResult, Color
 
-class MatchupsAssigner:
+class SwissAssigner:
     '''Matchup colors is main result we want to generate. Following round is generated based on it'''
     def __init__(
             self,
@@ -99,8 +99,10 @@ class MatchupsAssigner:
             matchups = []
             for mcs in self.matchup_colors:
                 matchups.append(Matchup({Color.W: PlayerMatch(mcs[0]), Color.B: PlayerMatch(mcs[1])}))
-            self.rounds.append(
-                Round(matchups, index = self.rounds[-1].index + 1)
+            self.tournament.rounds.append(
+                Round(
+                    matchups,
+                    index = self.tournament.rounds[-1].index + 1),
             )
 
 class RoundRobinAssigner:

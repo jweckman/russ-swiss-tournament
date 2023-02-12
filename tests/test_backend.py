@@ -8,7 +8,7 @@ from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.tie_break import calc_modified_median_solkoff, calc_sonne_koya
-from russ_swiss_tournament.matchup_assignment import MatchupsAssigner, RoundRobinAssigner
+from russ_swiss_tournament.matchup_assignment import SwissAssigner, RoundRobinAssigner
 from russ_swiss_tournament.db import Database
 from russ_swiss_tournament.service import MatchResult, Color
 
@@ -120,7 +120,7 @@ def create_rounds(t, m, count, round_matchups=None):
     return rounds
 
 # def test_should_calculate_modified_median_solkoff_correctly():
-#     # TODO: swap out round robin with matchupsassigner when it starts working
+#     # TODO: swap out round robin with swiss assigner when it starts working
 #     # Round Robin does not really make any sense with median sokoloff
 #     t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
 #     rra = RoundRobinAssigner(t)
@@ -130,35 +130,41 @@ def create_rounds(t, m, count, round_matchups=None):
 #
 #     assert True == False
 
-def test_should_calculate_sonne_koya_correctly():
+# def test_should_calculate_sonne_koya_correctly():
+#     t = Tournament.from_toml(
+#         Path.cwd() / 'tournaments' / 'test_round_robin' / 'config.toml',
+#         read_rounds = True,
+#         create_players=True,
+#     )
+#     # Use random generator if desired
+#     # rra = RoundRobinAssigner(t)
+#     # rra.prepare_tournament_rounds()
+#     # [fill_round_with_random_values(r) for r in t.rounds]
+#     sonne, koya = calc_sonne_koya(
+#         *t.get_player_defeated_drawn(),
+#         t.get_standings(),
+#         len(t.rounds),
+#     )
+#     print(f"Sonne: {sonne}")
+#     print(f"Koya: {koya}")
+#     assert sonne[9] == 30
+#     assert koya[9] == 1.5
+
+
+def test_should_generate_swiss_rounds_correctly():
     t = Tournament.from_toml(
-        Path.cwd() / 'tournaments' / 'dummy' / 'config.toml',
-        read_rounds = True,
-        create_players=True,
+        Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
+        create_players = True,
+        read_rounds = False,
     )
-    # Use random generator if desired
-    # rra = RoundRobinAssigner(t)
-    # rra.prepare_tournament_rounds()
-    # [fill_round_with_random_values(r) for r in t.rounds]
-    sonne, koya = calc_sonne_koya(
-        *t.get_player_defeated_drawn(),
-        t.get_standings(),
-        len(t.rounds),
-    )
-    print(f"Sonne: {sonne}")
-    print(f"Koya: {koya}")
-    assert sonne[9] == 30
-    assert koya[9] == 1.5
+    t.round_folder = Path.cwd() / 'tournaments' / 'dummy' / 'rounds',
+    sa = SwissAssigner(t)
+    create_rounds(t, sa, 9)
+    breakpoint()
+    pass
+    # TODO: check that every round has correctly assigned matches
+    # logic broken for now
 
-
-# def test_should_generate_swiss_rounds_correctly():
-#     t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
-#     ma = MatchupsAssigner(t)
-#     # create_rounds(t, m, 9)
-#     # m = MatchupsAssigner(t)
-#     # TODO: check that every round has correctly assigned matches
-#     # logic broken for now
-#
 # def test_should_generate_round_robin_rounds_correctly():
 #     t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
 #     db = Database()
