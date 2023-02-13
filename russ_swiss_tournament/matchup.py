@@ -88,3 +88,6 @@ class Matchup:
             winner_loser_colors = (Color.B, Color.W)
         return winner_loser_colors, is_walkover
 
+    def get_player_ids(self):
+        return self.res[Color.W].player.id, self.res[Color.B].player.id
+

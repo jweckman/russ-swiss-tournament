@@ -1,7 +1,10 @@
+from random import shuffle
+
 from russ_swiss_tournament.tournament import Tournament
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.service import MatchResult, Color
+from russ_swiss_tournament.player import Player
 
 class SwissAssigner:
     '''Matchup colors is main result we want to generate. Following round is generated based on it'''
@@ -48,44 +51,136 @@ class SwissAssigner:
 
         return white, black
 
-    def _assign_matchup_colors_to_res(self, higher, lower):
+    def _remove_from_candidates(self, player_ids):
+        for p in player_ids:
+            self.players_standing_sort.pop(self.players_standing_sort.index(p))
+
+    def _assign_matchup_colors_to_res(self, higher, lower, remove_candidates=True):
         white, black = self._assign_matchup_colors(higher, lower)
         self.matchup_colors.append((white, black))
-        self.already_paired.add(self.players_standing_sort.pop(self.players_standing_sort.index(white)))
-        self.already_paired.add(self.players_standing_sort.pop(self.players_standing_sort.index(black)))
+        self.already_paired.add(white)
+        self.already_paired.add(black)
+        if remove_candidates:
+            self._remove_from_candidates([higher,lower])
+        print(f"Matched players: w: {white} b: {black}")
+        print(f"Remaining players: {self.players_standing_sort}")
 
     def _assign_round_colors(self) -> list[tuple[int,int]]:
         '''
-        Returns list of player ids white, black
+        Returns list of player ids white, black.
+
+        Tricky and messy logic used at the moment.
+
+        The main logic works by recursively calling the _find_matchup_pairs_by_standing()
+        function until all players are assigned accodring to Swiss sytem rules.
+        Rule based assignment typically starts failing towards the later rounds. At
+        this stage the _swap_player() method starts being used to try swapping
+        out one of the previous players where possible.
+
+        Even the swapping logic will fail in case the round count and player
+        count get close enough to each other. To try tackling this, there is
+        the option to set the "z" variable higher to attempt brute forcing using
+        a randomized player order instead of ordered by standings.
+
+        TODO: Change print statements to debug logging where useful
+        TODO: Inform the user of the best acheived result if no result can be found so
+        that the last round(s) can be manually corrected.
         TODO: Only works for even player count
         '''
+        # set the range to more than 1 to try brute forcing with randomized player order
         if len(self.tournament.players) % 2 != 0:
             raise ValueError(
                 "Uneven number of participants is currently not supported"
             )
+        for z in range(10):
+            self.matchup_colors = []
+            self.already_paired = set()
 
-        opponents = self.tournament.get_opponents()
-        self.players_standing_sort = list(reversed(
-            {k: v for k, v in sorted(self.tournament.get_standings().items(), key=lambda item: item[1])}.keys()
-        ))
-        matchup_colors = []
-        self.already_paired = set()
-        def _find_matchup_pairs_by_standing():
-            if len(self.players_standing_sort) == 0:
-                return True
-            higher = self.players_standing_sort[0]
-            for p in self.players_standing_sort[1:]:
-                if p not in (self.already_paired | set(opponents[higher])):
-                    self._assign_matchup_colors_to_res(
-                        higher,
-                        p
+            self.opponents = self.tournament.get_opponents()
+            self.players_standing_sort = list(reversed(
+                {k: v for k, v in sorted(self.tournament.get_standings().items(), key=lambda item: item[1])}.keys()
+            ))
+            if z != 0:
+                # TODO: inform user of using brute force to generate
+                shuffle(self.players_standing_sort)
+
+            def _find_matchup_pairs_by_standing():
+                if len(self.players_standing_sort) == 0:
+                    return True
+                print(f"Attempting to match: {self.players_standing_sort[0]}")
+                higher = self.players_standing_sort[0]
+                higher_opponents = set(self.opponents[higher])
+                print(f"Already played opponents for {higher}: {higher_opponents}")
+                print(f"Already paired: {self.already_paired}")
+                pool = self.players_standing_sort[1:].copy()
+                for i, p in enumerate(pool):
+                    forbidden = (
+                        self.already_paired
+                        | higher_opponents
                     )
-                    _find_matchup_pairs_by_standing
-            return False
-        completed = _find_matchup_pairs_by_standing()
-        if not completed:
-            # go backwards through matchup_colors and look for people that can be swapped out
-            pass
+                    if p not in forbidden:
+                        self._assign_matchup_colors_to_res(
+                            higher,
+                            p
+                        )
+                        _find_matchup_pairs_by_standing()
+                        break
+                    print(f"Pool is {pool}")
+                    if p in forbidden and i == len(pool) - 1 :
+                        print(f"matchup_colors index: {i}/{len(pool) - 1}")
+                        print(f"matchup_colors len before swap: {len(self.matchup_colors)}")
+                        successful_swap = self._swap_player(higher, p)
+                        print(f"matchup_colors len after swap: {len(self.matchup_colors)}")
+                        if successful_swap:
+                            successful_swap = _find_matchup_pairs_by_standing()
+                        else:
+                            return False
+            success = _find_matchup_pairs_by_standing()
+            if success:
+                break
+
+    def _swap_player(self, higher: int, p: int):
+        '''
+        If a player no longer has valid opponents left after having assigned
+        the matches for the higher ranked players, reverse through the previously
+        assigned matches and swap out opponents when legally possible.
+
+        param higher: player that gets a new opponent. Only used to see previous opponents.
+        param p: the player that we swap out for another one.
+
+        Returns True if successful and False if swap failed.
+        '''
+        whites = [m[0] for m in self.matchup_colors]
+        whites_reversed = list(reversed(whites))
+        blacks = [m[1] for m in self.matchup_colors]
+        blacks_reversed = list(reversed(blacks))
+
+        {print(f"{k}: {v}") for k,v in self.opponents.items()}
+        {print(f"{k}: {v}") for k,v in self.tournament.get_opponents(inverse=True).items()}
+        for i, players in enumerate([blacks_reversed, whites_reversed]):
+            if i == 0:
+                other = whites_reversed
+            if i == 1:
+                other = blacks_reversed
+            for j, swap_candidate in enumerate(players):
+                print(f"-----SWAP CANDIDATE: {swap_candidate}-----")
+                candidate_current_opponent = other[j]
+                if  (
+                        swap_candidate not in self.opponents[higher]
+                        and p not in self.opponents[candidate_current_opponent]
+                    ):
+                    actual_index = -1 * (j + 1)
+                    assert {swap_candidate, candidate_current_opponent} == set(self.matchup_colors[actual_index])
+                    to_modify = self.matchup_colors[actual_index]
+                    print(f"replace this: {self.matchup_colors[actual_index]} with: {(candidate_current_opponent,p)} ")
+                    self.matchup_colors[actual_index] = (candidate_current_opponent,p)
+                    self._assign_matchup_colors_to_res(higher, swap_candidate, remove_candidates=False)
+                    self.players_standing_sort.pop(self.players_standing_sort.index(higher))
+                    self.players_standing_sort.pop(self.players_standing_sort.index(p))
+                    print(f"Swapped player {p} for {swap_candidate} from matchup {to_modify} to {higher,p}")
+                    print(f"remaining: {self.players_standing_sort}")
+                    return True
+        return False
 
     def create_next_round(self):
         if not self.tournament.rounds:
@@ -97,13 +192,27 @@ class SwissAssigner:
             self.tournament.validate_no_incomplete_match_results_in_rounds()
             self._assign_round_colors()
             matchups = []
+            assert len(self.matchup_colors) == len(self.tournament.players) / 2
             for mcs in self.matchup_colors:
-                matchups.append(Matchup({Color.W: PlayerMatch(mcs[0]), Color.B: PlayerMatch(mcs[1])}))
+                white = [p for p in self.tournament.players if p.id == mcs[0]][0]
+                black = [p for p in self.tournament.players if p.id == mcs[1]][0]
+                assert isinstance(white, Player)
+                matchups.append(
+                    Matchup(
+                        {
+                            Color.W: PlayerMatch(white),
+                            Color.B: PlayerMatch(black)
+                        }
+                    )
+                )
             self.tournament.rounds.append(
                 Round(
                     matchups,
                     index = self.tournament.rounds[-1].index + 1),
             )
+            # Make sure there are no unevenly assigned matchups
+            assert all([len(v) == len(self.tournament.rounds) for v in self.tournament.get_opponents().values()])
+            self.tournament.validate_no_duplicate_matchups()
 
 class RoundRobinAssigner:
     def __init__(

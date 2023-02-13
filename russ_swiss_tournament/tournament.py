@@ -25,6 +25,7 @@ class Tournament:
             self,
             players: list[Player],
             rounds: list[Round],
+            round_count: int,
             round_system: RoundSystem,
             tie_break_results_swiss: dict[tie_break.TieBreakMethodSwiss, dict],
             tie_break_results_round_robin: dict[tie_break.TieBreakMethodRoundRobin, dict],
@@ -36,6 +37,7 @@ class Tournament:
         ):
         self.players = players
         self.rounds = rounds
+        self.round_count = round_count
         self.round_system = round_system
         self.tie_break_results_swiss = tie_break_results_swiss
         self.tie_break_results_round_robin = tie_break_results_round_robin
@@ -126,6 +128,7 @@ class Tournament:
         return cls(
             players = players,
             rounds = rounds,
+            round_count = config['general']['rounds'],
             round_system = rs,
             tie_break_results_swiss = {x: None for x in used_swiss},
             tie_break_results_round_robin = {x: None for x in used_round_robin},
@@ -153,7 +156,14 @@ class Tournament:
         self.tie_break_results_round_robin[tie_break.TieBreakMethodRoundRobin.SONNEBORN_BERGER] = sonne
         self.tie_break_results_round_robin[tie_break.TieBreakMethodRoundRobin.KOYA] = koya
 
-    def get_opponents(self, until: str | int ='latest') -> dict[int,list[int]]:
+    def get_opponents(
+            self,
+            until: str | int ='latest',
+            inverse: bool = False,
+        ) -> dict[int,list[int]]:
+        '''
+        Possible to get unplayed by setting inverse boolean to True.
+        '''
         # TODO: add validation if faced twice
         player_ids = [p.id for p in self.players]
         if until == 'latest':
@@ -165,6 +175,11 @@ class Tournament:
             for m in r.matchups:
                 results[m.res[Color.W].player.id].append(m.res[Color.B].player.id)
                 results[m.res[Color.B].player.id].append(m.res[Color.W].player.id)
+        if inverse:
+            for player, opponents in results.copy().items():
+                players_minus_self = [p for p in player_ids if p != player]
+                results[player] = [p for p in players_minus_self if p not in opponents]
+
         return results
 
     def get_player_defeated_drawn(self) -> (dict[int,list[list,list]], dict[int,dict[int,float]]):
@@ -250,6 +265,26 @@ class Tournament:
                 raise ValueError(
                     f"Round {round.index} contains unset results, cannot continue."
                 )
+
+    def validate_no_duplicate_matchups(self):
+        '''
+        Checks the added rounds for duplicate matchups.
+        In case one is found, the last round is discarded.
+        '''
+        matchups = []
+        for round in self.rounds:
+            for mu in round.matchups:
+                player_ids = set(mu.get_player_ids())
+                if player_ids in matchups:
+                    raise ValueError(
+                        f"Round {round.index}\n{mu}\nis a duplicate.\n"
+                        "This is not allowed in Swiss tournament generation.\n"
+                        "Last tournament round was removed from the tournament."
+                    )
+                    self.rounds.pop(-1)
+                else:
+                    matchups.append(player_ids)
+
     def get_last_complete_round_index(self) -> int | None:
         if not self.rounds:
             return None

@@ -111,6 +111,7 @@ def create_rounds(t, m, count, round_matchups=None):
     rounds = []
     if not round_matchups:
         for r_id in range(count):
+            print(f"-------------- Round: {r_id + 1}-----------------")
             m.create_next_round()
             fill_round_with_random_values(t.rounds[-1])
     else:
@@ -152,18 +153,14 @@ def create_rounds(t, m, count, round_matchups=None):
 
 
 def test_should_generate_swiss_rounds_correctly():
-    t = Tournament.from_toml(
-        Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
-        create_players = True,
-        read_rounds = False,
-    )
-    t.round_folder = Path.cwd() / 'tournaments' / 'dummy' / 'rounds',
-    sa = SwissAssigner(t)
-    create_rounds(t, sa, 9)
-    breakpoint()
-    pass
-    # TODO: check that every round has correctly assigned matches
-    # logic broken for now
+    for i in range(100):
+        t = Tournament.from_toml(
+            Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
+            create_players = True,
+            read_rounds = False,
+        )
+        sa = SwissAssigner(t)
+        create_rounds(t, sa, t.round_count)
 
 # def test_should_generate_round_robin_rounds_correctly():
 #     t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
