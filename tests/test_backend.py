@@ -120,48 +120,6 @@ def create_rounds(t, m, count, round_matchups=None):
 
     return rounds
 
-# def test_should_calculate_modified_median_solkoff_correctly():
-#     # TODO: swap out round robin with swiss assigner when it starts working
-#     # Round Robin does not really make any sense with median sokoloff
-#     t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
-#     rra = RoundRobinAssigner(t)
-#     rra.prepare_tournament_rounds()
-#     [fill_round_with_random_values(r) for r in t.rounds]
-#     calc_modified_median_solkoff(t.rounds, [p.id for p in t.players], t.get_opponents())
-#
-#     assert True == False
-
-# def test_should_calculate_sonne_koya_correctly():
-#     t = Tournament.from_toml(
-#         Path.cwd() / 'tournaments' / 'test_round_robin' / 'config.toml',
-#         read_rounds = True,
-#         create_players=True,
-#     )
-#     # Use random generator if desired
-#     # rra = RoundRobinAssigner(t)
-#     # rra.prepare_tournament_rounds()
-#     # [fill_round_with_random_values(r) for r in t.rounds]
-#     sonne, koya = calc_sonne_koya(
-#         *t.get_player_defeated_drawn(),
-#         t.get_standings(),
-#         len(t.rounds),
-#     )
-#     print(f"Sonne: {sonne}")
-#     print(f"Koya: {koya}")
-#     assert sonne[9] == 30
-#     assert koya[9] == 1.5
-
-
-def test_should_generate_swiss_rounds_correctly():
-    for i in range(100):
-        t = Tournament.from_toml(
-            Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
-            create_players = True,
-            read_rounds = False,
-        )
-        sa = SwissAssigner(t)
-        create_rounds(t, sa, t.round_count)
-
 # def test_should_generate_round_robin_rounds_correctly():
 #     t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
 #     db = Database()
@@ -171,27 +129,53 @@ def test_should_generate_swiss_rounds_correctly():
 #     for r in t.rounds:
 #         r.write_csv(Path.cwd() / 'tournaments' / 'dummy' / 'rounds', db)
 
+def test_should_calculate_sonne_koya_correctly():
+    t = Tournament.from_toml(
+        Path.cwd() / 'tournaments' / 'test_round_robin' / 'config.toml',
+        read_rounds = True,
+        create_players=True,
+    )
+    # Use random generator if desired
+    # rra = RoundRobinAssigner(t)
+    # rra.prepare_tournament_rounds()
+    # [fill_round_with_random_values(r) for r in t.rounds]
+    sonne, koya = calc_sonne_koya(
+        *t.get_player_defeated_drawn(),
+        t.get_standings(),
+        len(t.rounds),
+    )
+    print(f"Sonne: {sonne}")
+    print(f"Koya: {koya}")
+    assert sonne[9] == 30
+    assert koya[9] == 1.5
 
-#
+
+# def test_should_generate_swiss_rounds_correctly():
+#     for i in range(100):
+#         t = Tournament.from_toml(
+#             Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
+#             create_players = True,
+#             read_rounds = False,
+#         )
+#         sa = SwissAssigner(t)
+#         create_rounds(t, sa, t.round_count)
+
+def test_should_calculate_modified_median_solkoff_correctly():
+    t = Tournament.from_toml(
+        Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
+        create_players = True,
+        read_rounds = False,
+    )
+    sa = SwissAssigner(t)
+    create_rounds(t, sa, t.round_count)
+    t.calculate_tie_break_results_swiss()
+    # TODO: Check that calculations are in order
+
+    assert True == False
+
 # # DATABASE
 def test_read_players_from_csv_db():
     db = Database()
     db.read_players()
     assert isinstance(db.players[0], Player)
 
-# def test_read_round_from_csv():
-#     pass
-#
-# def test_generate_round_robin_rounds():
-#     pass
-#
-# def test_generate_swiss_round_first():
-#     pass
-#
-# def test_generate_swiss_round_middle():
-#     pass
-#
-# def test_generate_swiss_round_last():
-#     pass
-#
-#

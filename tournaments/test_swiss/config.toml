@@ -1,0 +1,39 @@
+[general]
+title = "Swiss test"
+year = 2023
+count = 23
+rounds = 9
+round_system = "swiss"
+tie_break_methods_swiss =  [
+  "modified_median",
+  "solkoff"
+]
+folder = "test_swiss"
+round_folder = "rounds"
+
+[management]
+coordinator = "Dummy"
+commitee_members = [
+  "Dummy2",
+]
+
+[players]
+ids = [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+]
+

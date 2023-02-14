@@ -1,0 +1,41 @@
+[general]
+title = "Tournament Name"
+year = 2023
+count = 23
+rounds = 9
+round_system = "berger"
+tie_break_methods_swiss =  [
+  "modified_median",
+  "solkoff"
+]
+tie_break_methods_round_robin = [
+  "sonneborn_berger",
+  "koya"
+]
+folder = "test_round_robin"
+round_folder = "testing_rounds_round_robin"
+
+[management]
+coordinator = "Dummy"
+commitee_members = [
+  "Dummy2",
+]
+
+[players]
+ids = [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14
+]
+
