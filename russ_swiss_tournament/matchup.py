@@ -1,9 +1,15 @@
 from enum import Enum
 from dataclasses import dataclass
 import itertools
+from typing import Self
+
+from sqlmodel import select, col
 
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.service import  MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
+
+from htmx.db import get_session
+from htmx.models import MatchupModel, RoundModel
 
 
 @dataclass
@@ -17,6 +23,8 @@ class Matchup:
             self,
             res: dict[Color, PlayerMatch],
         ):
+        # if any(x.res is None for x in res.values()):
+        #     breakpoint()
         self.id = next(self.id_iter)
         self.res = res
 
@@ -28,6 +36,81 @@ class Matchup:
     def res(self, value):
         self.validate_result(value)
         self._res = value
+
+    @classmethod
+    def from_db(
+            cls,
+            selves: list[Self] | list[int],
+        ) -> tuple[list[Self], list[MatchupModel]]:
+        is_ids = False
+        if isinstance(selves[0], int):
+            is_ids = True
+        session = next(get_session())
+        ids = [t.id for t in selves] if not is_ids else selves
+        existing_db = [t for t in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
+        if len(existing_db) != len(selves):
+            raise ValueError(
+                f"Trying to create {cls.__name__} from db records but some ids are missing.\n"
+                f"Please make sure that all the following ids are in the db: {ids}"
+            )
+        objects: list = []
+        for record in existing_db:
+            matchup = {
+                Color.W: PlayerMatch(Player.from_db(record.white_id)[0][0], MatchResult(record.white_result)),
+                Color.B: PlayerMatch(Player.from_db(record.black_id)[0][0], MatchResult(record.black_result))
+            }
+            objects.append(
+                Matchup(
+                    res = matchup,
+                )
+            )
+        return objects, existing_db
+
+    @classmethod
+    def db_write(
+            self,
+            selves: list[Self],
+            update: bool = True,
+        ) -> list[MatchupModel]:
+        '''Writes/updates selves to db'''
+        session = next(get_session())
+        ids = [t.id for t in selves]
+        existing_db = [t for t in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
+        existing_db_ids = [t.id for t in existing_db]
+        new_records: list = []
+        for t_obj in selves:
+            if t_obj.id in existing_db_ids:
+                if update:
+                    pass  # TODO
+            else:
+                new_record = MatchupModel(
+                    white_id = t_obj.res[Color.W].player.id,
+                    black_id = t_obj.res[Color.B].player.id,
+                    white_score = t_obj.res[Color.W].res.value,
+                    black_score = t_obj.res[Color.B].res.value,
+                )
+                session.add(new_record)
+                session.flush()
+                session.refresh(new_record)
+                if new_record.id is None:
+                    raise ValueError("Trying to create a matchup without an id")
+                t_obj.id = new_record.id
+                session.commit()
+                new_records.append(new_record)
+        return new_records
+
+# class PlayerMatch:
+#     player: Player
+#     res: MatchResult = MatchResult.UNSET
+#
+# class Matchup:
+#     id_iter = itertools.count()
+#     def __init__(
+#             self,
+#             res: dict[Color, PlayerMatch],
+        if not res:
+            raise ValueError(f"Could not create {cls.__name__}, no matching records in db")
+        return res
 
     def __str__(self):
         white = self.res[Color.W]
@@ -67,8 +150,8 @@ class Matchup:
 
     def add_result(
             self,
-            white_res:MatchResult,
-            black_res:MatchResult,
+            white_res: MatchResult,
+            black_res: MatchResult,
         ):
         '''
         IMPORTANT: Requires that instance has been instantiated with

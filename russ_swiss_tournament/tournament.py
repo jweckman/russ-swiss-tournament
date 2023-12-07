@@ -3,12 +3,19 @@ from pathlib import Path
 from collections import Counter
 import pprint
 from enum import Enum
+from typing import Self
+import itertools
+
+from sqlmodel import select, col
 
 from russ_swiss_tournament.round import Round, match_result_score_map
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament import tie_break
 from russ_swiss_tournament.service import MatchResult, Color, pairwise, split_list
+
+from htmx.db import get_session
+from htmx.models import TournamentModel, RoundModel, PlayerModel, MatchupModel
 
 class RoundSystem(Enum):
     SWISS = 1
@@ -21,8 +28,11 @@ round_system_tie_break_map = {
 
 class Tournament:
     '''player list should be sorted by ranking before start of tournament'''
+    id_iter = itertools.count()
+
     def __init__(
             self,
+            name: str,
             players: list[Player],
             rounds: list[Round],
             round_count: int,
@@ -31,10 +41,16 @@ class Tournament:
             tie_break_results_round_robin: dict[tie_break.TieBreakMethodRoundRobin, dict],
             year: int,
             count: int,
+            id: int = -1,
             create_players: bool = False,
             folder: Path | None = None,
             round_folder: Path | None = None,
         ):
+        if id == -1:
+            self.id = next(self.id_iter)
+        else:
+            self.id = id
+        self.name = name
         self.players = players
         self.rounds = rounds
         self.round_count = round_count
@@ -63,6 +79,44 @@ class Tournament:
                     "not respecting this ordering and should be fixed."
                 )
         self._rounds = value
+
+    @classmethod
+    def db_write(
+            self,
+            selves: list[Self],
+            update: bool = True,
+        ) -> list[TournamentModel]:
+        '''Writes/updates selves to db'''
+        session = next(get_session())
+        ids = [t.id for t in selves]
+        existing_db = [t for t in session.exec(select(TournamentModel).where(col(TournamentModel.id).in_(ids)))]
+        print(session.exec(select(TournamentModel)).all())
+        existing_db_ids = [t.id for t in existing_db]
+        new_records: list[TournamentModel] = []
+        for t_obj in selves:
+            if t_obj.id in existing_db_ids:
+                if update:
+                    pass  # TODO
+            else:
+                new_record = TournamentModel(
+                    name = t_obj.name,
+                    year = t_obj.year,
+                    count = t_obj.count,
+                    round_count = t_obj.round_count,
+                    round_system = t_obj.round_system.value,
+                    # TODO test this out
+                    players = Player.db_write(t_obj.players),
+                    rounds = Round.db_write(t_obj.rounds),
+                )
+                session.add(new_record)
+                session.flush()
+                session.refresh(new_record)
+                if new_record.id is None:
+                    raise ValueError("Trying to create a tournament without an id")
+                t_obj.id = new_record.id
+                session.commit()
+                new_records.append(new_record)
+        return new_records
 
     @classmethod
     def create_players(cls, ids, first_names = None, last_names = None):
@@ -126,6 +180,7 @@ class Tournament:
         rs = getattr(RoundSystem, config['general']['round_system'].upper())
 
         return cls(
+            name = config['general']['title'],
             players = players,
             rounds = rounds,
             round_count = config['general']['rounds'],

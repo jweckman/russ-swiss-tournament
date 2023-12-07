@@ -1,4 +1,7 @@
 from pathlib import Path
+from typing import Annotated
+from time import sleep
+from datetime import datetime
 
 from russ_swiss_tournament.tournament import Tournament
 from russ_swiss_tournament.player import Player
@@ -10,6 +13,20 @@ from russ_swiss_tournament.db import Database
 from russ_swiss_tournament.cli import main
 from russ_swiss_tournament.service import MatchResult, Color
 
+import htmx.router
+from htmx.db import create_db_and_tables, populate_test_data
+
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
+def init_htmx():
+    '''Run application with web front-end'''
+    global app
+    app = FastAPI(default_response_class=HTMLResponse)
+    app.include_router(htmx.router.router)
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
 def generate_round_robin_rounds():
     db = Database()
     db.read_players()
@@ -18,13 +35,19 @@ def generate_round_robin_rounds():
         read_rounds = True,
         db=db
     )
+    return t
     # rra = RoundRobinAssigner(t)
     # rra.prepare_tournament_rounds()
     # for r in t.rounds:
     #     r.write_csv(t.folder / 'rounds', db)
-    main(t)
 
-generate_round_robin_rounds()
+    # # Run app in CLI mode
+    # main(t)
 
-if __name__ == '__main__':
-    pass
+t = generate_round_robin_rounds()
+init_htmx()
+t.db_write([t])
+
+if __name__ == "__main__":
+    create_db_and_tables()
+    populate_test_data()

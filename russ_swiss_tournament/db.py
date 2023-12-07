@@ -10,6 +10,7 @@ class Database:
             players_csv_path = Path().cwd() / 'player.csv',
         ):
         self.players_csv_path = players_csv_path
+        self.players = players
 
     def read_players(self):
         active_map = {
@@ -25,12 +26,13 @@ class Database:
             player_reader = csv.reader(csv_file, delimiter=',', quotechar='"')
             headers = next(player_reader, None)
             for line in player_reader:
-                players.append(Player(
+                player = Player(
                     id = int(line[0]),
                     first_name = line[3].strip(),
                     last_name = line[2].strip(),
                     active = active_map[line[1].strip().lower()]
-                ))
+                )
+                players.append(player)
         self.players = players
 
     def get_player_by_id(self, id) -> Player:

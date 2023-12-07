@@ -1,9 +1,16 @@
 import itertools
 import csv
+from typing import Self
+
+from sqlmodel import select, col
+
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.db import Database
 from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
+
+from htmx.db import get_session
+from htmx.models import TournamentModel, RoundModel
 
 match_result_manual_map = {
     1: MatchResult.WIN,
@@ -43,10 +50,76 @@ class Round:
             self,
             matchups: list[Matchup],
             index: int = 1,
+            id: int = -1,
         ):
-        self.id = next(self.id_iter)
+        if id == -1:
+            self.id = next(self.id_iter)
+        else:
+            self.id = id
         self.matchups = matchups
         self.index = index
+
+    @classmethod
+    def db_write(
+            cls,
+            selves: list[Self],
+            update: bool = True,
+        ):
+        '''Writes/updates selves to db'''
+        session = next(get_session())
+        ids = [t.id for t in selves]
+        existing_db = [t for t in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
+        existing_db_ids = [t.id for t in existing_db]
+
+        new_records: list[RoundModel] = []
+        for t_obj in selves:
+            if t_obj.id in existing_db_ids:
+                if update:
+                    pass  # TODO
+            else:
+                new_record = RoundModel(
+                    index = t_obj.index,
+                    matchups = Matchup.db_write(t_obj.matchups),
+                )
+                session.add(new_record)
+                session.add(new_record)
+                session.flush()
+                session.refresh(new_record)
+                if new_record.id is None:
+                    raise ValueError("Trying to create a matchup without an id")
+                t_obj.id = new_record.id
+                session.commit()
+                new_records.append(new_record)
+        return new_records
+
+    @classmethod
+    def from_db(
+            cls,
+            selves: list[Self] | list[int],
+        ) -> tuple[list[Self], list[RoundModel]]:
+        is_ids = False
+        if isinstance(selves[0], int):
+            is_ids = True
+        session = next(get_session())
+        ids = [t.id for t in selves] if not is_ids else selves
+        existing_db = [t for t in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
+        if len(existing_db) != len(selves):
+            raise ValueError(
+                f"Trying to create {cls.__name__} from db records but some ids are missing.\n"
+                f"Please make sure that all the following ids are in the db: {ids}"
+            )
+        objects: list = []
+        for record in existing_db:
+            objects.append(
+                Round(
+                    id = record. id,
+                    index = record.index,
+                    matchups = Matchup.from_db(record.matchups)
+                )
+            )
+        if not objects:
+            raise ValueError(f"Could not create {cls.__name__}, no matching records in db")
+        return objects, existing_db
 
     @classmethod
     def match_player(cls, s:str, players: list[Player]) -> Player:
