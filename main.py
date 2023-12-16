@@ -3,6 +3,8 @@ from typing import Annotated
 from time import sleep
 from datetime import datetime
 
+import config
+
 from russ_swiss_tournament.tournament import Tournament
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
@@ -44,9 +46,9 @@ def generate_round_robin_rounds():
     # # Run app in CLI mode
     # main(t)
 
-t = generate_round_robin_rounds()
+config.tournament = generate_round_robin_rounds()
 init_htmx()
-t.db_write([t])
+# t.db_write([t])
 
 if __name__ == "__main__":
     create_db_and_tables()
