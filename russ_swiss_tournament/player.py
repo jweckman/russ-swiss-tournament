@@ -1,3 +1,5 @@
+import csv
+from pathlib import Path
 from typing import Self
 
 from sqlmodel import select, col
@@ -36,7 +38,7 @@ class Player:
             is_ids = True
         session = next(get_session())
         ids = [t.id for t in selves] if not is_ids else selves
-        existing_db = [t for t in session.exec(select(PlayerModel).where(col(PlayerModel.id).in_(ids)))]
+        existing_db = [t for t in session.exec(select(PlayerModel).where(col(PlayerModel.identifier).in_(ids)))]
         if len(existing_db) != len(selves):
             raise ValueError(
                 f"Trying to create {cls.__name__} from db records but some ids are missing.\n"
@@ -46,7 +48,7 @@ class Player:
         for record in existing_db:
             objects.append(
                 Player(
-                    id = record.id,
+                    id = record.identifier,
                     first_name = record.first_name,
                     last_name = record.last_name,
                 )
@@ -62,8 +64,8 @@ class Player:
         '''Writes/updates selves to db'''
         session = next(get_session())
         ids = [t.id for t in selves]
-        existing_db = [t for t in session.exec(select(PlayerModel).where(col(PlayerModel.id).in_(ids)))]
-        existing_db_ids = [t.id for t in existing_db]
+        existing_db = [t for t in session.exec(select(PlayerModel).where(col(PlayerModel.identifier).in_(ids)))]
+        existing_db_ids = [t.identifier for t in existing_db]
         new_records: list[PlayerModel] = []
         for t_obj in selves:
             if t_obj.id in existing_db_ids:
@@ -71,6 +73,7 @@ class Player:
                     pass  # TODO
             else:
                 new_record = PlayerModel(
+                    identifier = t_obj.id,
                     first_name = t_obj.first_name,
                     last_name = t_obj.last_name,
                     active = t_obj.active,
@@ -84,3 +87,31 @@ class Player:
                 session.commit()
                 new_records.append(new_record)
         return new_records
+
+    @classmethod
+    def read_players_from_csv(
+            cls,
+            path=Path().cwd() / 'player.csv'
+        ):
+        active_map = {
+            'yes': True,
+            'no': False,
+            '0': False,
+            '1': True,
+            0: False,
+            1: True,
+        }
+        players = []
+        with open(path, 'r', newline='') as csv_file:
+            player_reader = csv.reader(csv_file, delimiter=',', quotechar='"')
+            headers = next(player_reader, None)
+            for line in player_reader:
+                player = Player(
+                    id = int(line[0]),
+                    first_name = line[3].strip(),
+                    last_name = line[2].strip(),
+                    active = active_map[line[1].strip().lower()]
+                )
+                players.append(player)
+        Player.db_write(players)
+

@@ -23,8 +23,6 @@ class Matchup:
             self,
             res: dict[Color, PlayerMatch],
         ):
-        # if any(x.res is None for x in res.values()):
-        #     breakpoint()
         self.id = next(self.id_iter)
         self.res = res
 

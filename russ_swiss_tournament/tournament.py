@@ -157,7 +157,7 @@ class Tournament:
         if create_players:
             players = cls.create_players(player_ids)
         elif db:
-            players = [db.get_player_by_id(pid) for pid in player_ids]
+            players = Player.from_db(player_ids)[0]
         if read_rounds:
             rounds = cls.read_rounds(round_path, players)
         swiss_tie_break = config['general'].get('tie_break_methods_swiss')

@@ -30,12 +30,11 @@ def init_htmx():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 def generate_round_robin_rounds():
-    db = Database()
-    db.read_players()
+    Player.read_players_from_csv()
     t = Tournament.from_toml(
         Path.cwd() / 'tournaments' / 'russ_29' / 'config.toml',
         read_rounds = True,
-        db=db
+        db = 'htmx',
     )
     return t
     # rra = RoundRobinAssigner(t)
