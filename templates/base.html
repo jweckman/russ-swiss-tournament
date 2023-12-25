@@ -12,7 +12,12 @@
   {% endblock %}
 </head>
 <body>
-    <!-- <div id="content">{% block content %}{% endblock %}</div> -->
+    <div id="content">{% block content %}
+      <div id="round_form"
+        hx-get="/round_input/1"
+        hx-trigger="load"
+      >
+    {% endblock %}</div>
     <h1>Hello</h1>
 </body>
 </html>

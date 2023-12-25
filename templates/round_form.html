@@ -4,51 +4,26 @@
       <p class="text-lg">Fill in round results</p><br>
       {% for m in matchups %}
       <label for="matchup_input_{{m.white_id}}">{{m.white_full_name}}</label><br>
-      <select id="matchup_input_{{m.white_id}}" name="matchup_input_{{m.white_id}}"
-        <option value="1">1</option>
-        <option value="0">0</option>
-        <option value="0.5">½</option>
+      <select id="matchup_input_{{m.white_id}}"
+        _="on change put white_black_result_map[me.value] into #matchup_result_black"
+        name="matchup_input_{{m.white_id}}"
+          <option value="unset">unset</option>
+          <option value="1">1</option>
+          <option value="0">0</option>
+          <option value="0.5">½</option>
       </select>
+      <p id="matchup_full_name_black">{{m.black_full_name}}</p>
+      <p id="matchup_result_black">unset</p>
       {% endfor %}
     </form>
   </div>
 </div>
-<!-- <div> -->
-<!--   <button -->
-<!--     hx-get="/content" -->
-<!--     hx-trigger="click" -->
-<!--     hx-target="#content" -->
-<!--     hx-swap="innerHTML" -->
-<!--   > -->
-<!--     Cancel -->
-<!--   </button> -->
-<!--   {% with  stopwatch_button_name='Start'%} -->
-<!--     {% include 'stopwatch_button_start.html' %} -->
-<!--   {% endwith %} -->
-<!--   {% include 'stopwatch_button_reset.html' %} -->
-<!--   <button -->
-<!--     hx-get="/task_form_points_duration/{{task_category.id}}" -->
-<!--     hx-trigger="click" -->
-<!--     hx-target="#points_duration" -->
-<!--     hx-swap="innerHTML" -->
-<!--   > -->
-<!--     Use stopwatch time -->
-<!--   </button> -->
-<!--   <p id="stopwatch_user" class="invisible"></p> -->
-<!--   <div  -->
-<!--     id="stopwatch_stream"  -->
-<!--     class="invisible"  -->
-<!--     _="on mutation of @class set #stopwatch_user.innerHTML to me.innerHTML then remove .invisible from #stopwatch_user" -->
-<!--     hx-ext="sse" -->
-<!--     sse-connect="/stopwatch_stream" -->
-<!--     sse-swap="{{user_id}}" -->
-<!--   > -->
-<!--   </div> -->
-<!-- </div> -->
-<!-- <script> -->
-<!--   const elem = document.querySelector('input[name="task_form_date"]'); -->
-<!--   const datepicker = new Datepicker(elem, { -->
-<!--     format: "yyyy-mm-dd", -->
-<!--     autohide: true -->
-<!--   }); -->
-<!-- </script> -->
+
+<script>
+var white_black_result_map = {
+  "1": "0",
+  "0": "1",
+  "½": "½",
+  "unset": "unset",
+};
+</script>

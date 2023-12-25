@@ -97,19 +97,6 @@ class Matchup:
                 new_records.append(new_record)
         return new_records
 
-# class PlayerMatch:
-#     player: Player
-#     res: MatchResult = MatchResult.UNSET
-#
-# class Matchup:
-#     id_iter = itertools.count()
-#     def __init__(
-#             self,
-#             res: dict[Color, PlayerMatch],
-        if not res:
-            raise ValueError(f"Could not create {cls.__name__}, no matching records in db")
-        return res
-
     def __str__(self):
         white = self.res[Color.W]
         black = self.res[Color.B]

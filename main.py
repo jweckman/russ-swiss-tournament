@@ -36,6 +36,7 @@ def generate_round_robin_rounds():
         read_rounds = True,
         db = 'htmx',
     )
+    # t.db_write([t])
     return t
     # rra = RoundRobinAssigner(t)
     # rra.prepare_tournament_rounds()
@@ -47,7 +48,6 @@ def generate_round_robin_rounds():
 
 config.tournament = generate_round_robin_rounds()
 init_htmx()
-# t.db_write([t])
 
 if __name__ == "__main__":
     create_db_and_tables()
