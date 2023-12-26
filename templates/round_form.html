@@ -1,29 +1,41 @@
-<div class="flex justify-between">
-  <div>
-    <form class="bg-gray-100" hx-post="/round_add" hx-target="#content">
-      <p class="text-lg">Fill in round results</p><br>
-      {% for m in matchups %}
-      <label for="matchup_input_{{m.white_id}}">{{m.white_full_name}}</label><br>
-      <select id="matchup_input_{{m.white_id}}"
-        _="on change put white_black_result_map[me.value] into #matchup_result_black"
-        name="matchup_input_{{m.white_id}}"
-          <option value="unset">unset</option>
-          <option value="1">1</option>
-          <option value="0">0</option>
-          <option value="0.5">½</option>
-      </select>
-      <p id="matchup_full_name_black">{{m.black_full_name}}</p>
-      <p id="matchup_result_black">unset</p>
-      {% endfor %}
-    </form>
-  </div>
+<div>
+  <form class="bg-gray-100" hx-post="/round_add" hx-target="#content">
+    <p class="text-lg">Fill in round results</p>
+    <div class="p-3">
+    {% for m in matchups %}
+    <div class="flex gap-2">
+      <div class="basis-1/6">
+        <label for="matchup_input_{{m.white_id}}">{{m.white_full_name}}</label>
+      </div>
+      <div class="flex">
+        <select
+          id="matchup_input_{{m.white_id}}"
+          selected="{{m.white_score|default('unset')}}"
+          _="on change put white_black_result_map[me.value] into #matchup_result_black_{{m.black_id}}"
+          name="matchup_input_{{m.white_id}}">
+            <option value="unset">unset</option>
+            <option value="1">1</option>
+            <option value="0">0</option>
+            <option value="0.5">½</option>
+        </select>
+      </div>
+      <div class="basis-1/6">
+        <p id="matchup_full_name_black_{{m.black_id}}">{{m.black_full_name}}</p>
+      </div>
+      <div class="flex">
+          <p id="matchup_result_black_{{m.black_id}}">{{m.black_score|default('unset')}}</p>
+      </div>
+    </div>
+    {% endfor %}
+    </div>
+  </form>
 </div>
 
 <script>
 var white_black_result_map = {
   "1": "0",
   "0": "1",
-  "½": "½",
+  "0.5": "½",
   "unset": "unset",
 };
 </script>

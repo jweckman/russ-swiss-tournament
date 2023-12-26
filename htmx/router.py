@@ -42,7 +42,6 @@ async def testing(
     )
     round_model_res = session.exec(round_model_query).first()
     matchups: list = []
-    # TODO: sync player ids in test db and test view loading
     for matchup_data in round_model_res.matchups:
         matchup = dict()
         white_full_name = [p for p in config.tournament.players if p.id == matchup_data.white_id]
@@ -53,6 +52,8 @@ async def testing(
             matchup['black_full_name'] = black_full_name[0].get_full_name()
         matchup['white_result'] = match_result_score_map[MatchResult(matchup_data.white_score)]
         matchup['black_result'] = match_result_score_map[MatchResult(matchup_data.white_score)]
+        matchup['white_id'] = matchup_data.white_id
+        matchup['black_id'] = matchup_data.black_id
         matchups.append(matchup)
 
     context = {
