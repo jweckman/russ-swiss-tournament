@@ -1,6 +1,6 @@
 <div>
   <form class="bg-gray-100" hx-post="/round_add" hx-target="#content">
-    <p class="text-lg">Fill in round results</p>
+    <p class="text-lg">Fill in round results for round: {{round_id}}</p>
     <div class="p-3">
     {% for m in matchups %}
     <div class="flex gap-2">

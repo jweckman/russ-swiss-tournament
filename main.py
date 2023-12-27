@@ -38,7 +38,7 @@ def generate_round_robin_rounds():
     )
     # t.db_write([t])
     return t
-    # rra = RoundRobinAssigner(t)
+    # rra = RoudRobinAssigner(t)
     # rra.prepare_tournament_rounds()
     # for r in t.rounds:
     #     r.write_csv(t.folder / 'rounds', db)

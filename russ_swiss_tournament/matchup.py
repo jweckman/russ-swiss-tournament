@@ -72,29 +72,33 @@ class Matchup:
         ) -> list[MatchupModel]:
         '''Writes/updates selves to db'''
         session = next(get_session())
-        ids = [t.id for t in selves]
-        existing_db = [t for t in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
-        existing_db_ids = [t.id for t in existing_db]
+        ids = [m.id for m in selves]
+        existing_db = [m for m in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
+        existing_db_ids = [m.id for m in existing_db]
         new_records: list = []
         for t_obj in selves:
+            # TODO: debug and fix matchup ids being the same
+            # if t_obj.res[Color.W].player.id == 72:
+            #     breakpoint()
             if t_obj.id in existing_db_ids:
+                print('WARNING: creating matchup with already existing id, new record created instead of updating')
                 if update:
                     pass  # TODO
-            else:
-                new_record = MatchupModel(
-                    white_id = t_obj.res[Color.W].player.id,
-                    black_id = t_obj.res[Color.B].player.id,
-                    white_score = t_obj.res[Color.W].res.value,
-                    black_score = t_obj.res[Color.B].res.value,
-                )
-                session.add(new_record)
-                session.flush()
-                session.refresh(new_record)
-                if new_record.id is None:
-                    raise ValueError("Trying to create a matchup without an id")
-                t_obj.id = new_record.id
-                session.commit()
-                new_records.append(new_record)
+            # else:
+            new_record = MatchupModel(
+                white_id = t_obj.res[Color.W].player.id,
+                black_id = t_obj.res[Color.B].player.id,
+                white_score = t_obj.res[Color.W].res.value,
+                black_score = t_obj.res[Color.B].res.value,
+            )
+            session.add(new_record)
+            session.flush()
+            session.refresh(new_record)
+            if new_record.id is None:
+                raise ValueError("Trying to create a matchup without an id")
+            t_obj.id = new_record.id
+            session.commit()
+            new_records.append(new_record)
         return new_records
 
     def __str__(self):

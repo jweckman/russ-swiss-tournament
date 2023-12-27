@@ -59,5 +59,6 @@ async def testing(
     context = {
         "request": request,
         "matchups": matchups,
+        "round_id": round_id,
     }
     return templates.TemplateResponse("round_form.html", context)

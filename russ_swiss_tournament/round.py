@@ -67,9 +67,9 @@ class Round:
         ):
         '''Writes/updates selves to db'''
         session = next(get_session())
-        ids = [t.id for t in selves]
-        existing_db = [t for t in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
-        existing_db_ids = [t.id for t in existing_db]
+        ids = [r.id for r in selves]
+        existing_db = [r for r in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
+        existing_db_ids = [r.id for r in existing_db]
 
         new_records: list[RoundModel] = []
         for t_obj in selves:
@@ -81,7 +81,6 @@ class Round:
                     index = t_obj.index,
                     matchups = Matchup.db_write(t_obj.matchups),
                 )
-                session.add(new_record)
                 session.add(new_record)
                 session.flush()
                 session.refresh(new_record)

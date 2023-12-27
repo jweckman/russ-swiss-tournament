@@ -12,11 +12,17 @@
   {% endblock %}
 </head>
 <body>
-    <div id="content">{% block content %}
-      <div id="round_form"
-        hx-get="/round_input/1"
-        hx-trigger="load"
-      >
-    {% endblock %}</div>
+    <div id="tabs" hx-target="#tab-contents" role="tablist" _="on htmx:afterOnLoad set @aria-selected of <[aria-selected=true]/> to false tell the target take .selected set @aria-selected to true">
+        <button role="tab" aria-controls="tab-content" aria-selected="true" hx-get="/round_input/1" class="selected">R1</button>
+        <button role="tab" aria-controls="tab-content" aria-selected="false" hx-get="/round_input/2">R2</button>
+        <button role="tab" aria-controls="tab-content" aria-selected="false" hx-get="/round_input/3">R3</button>
+        <button role="tab" aria-controls="tab-content" aria-selected="false" hx-get="/round_input/4">R4</button>
+        <button role="tab" aria-controls="tab-content" aria-selected="false" hx-get="/round_input/5">R5</button>
+        <button role="tab" aria-controls="tab-content" aria-selected="false" hx-get="/round_input/6">R6</button>
+        <button role="tab" aria-controls="tab-content" aria-selected="false" hx-get="/round_input/7">R7</button>
+        <button role="tab" aria-controls="tab-content" aria-selected="false" hx-get="/round_input/8">R8</button>
+    </div>
+    <div id="content">{% block content %}{% endblock %}</div>
+    </div>
 </body>
 </html>
