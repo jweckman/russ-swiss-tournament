@@ -42,9 +42,9 @@ class RoundModel(SQLModel, table=True):
 
 class MatchupModel(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    white_id: int
+    white_identifier: int
     white_score: int
-    black_id: int
+    black_identifier: int
     black_score: int
 
     round_id: Optional[int] = Field(default=None, foreign_key="roundmodel.id")

@@ -39,7 +39,7 @@ class SwissAssigner:
                 black = lower
                 white = higher
         else:
-            player_ids_by_rank = [p.id for p in self.tournament.players]
+            player_ids_by_rank = [p.identifier for p in self.tournament.players]
             higher_rank_index = player_ids_by_rank.index(higher)
             lower_rank_index = player_ids_by_rank.index(lower)
             if higher_rank_index < lower_rank_index:
@@ -194,8 +194,8 @@ class SwissAssigner:
             matchups = []
             assert len(self.matchup_colors) == len(self.tournament.players) / 2
             for mcs in self.matchup_colors:
-                white = [p for p in self.tournament.players if p.id == mcs[0]][0]
-                black = [p for p in self.tournament.players if p.id == mcs[1]][0]
+                white = [p for p in self.tournament.players if p.identifier == mcs[0]][0]
+                black = [p for p in self.tournament.players if p.identifier == mcs[1]][0]
                 assert isinstance(white, Player)
                 matchups.append(
                     Matchup(
@@ -303,8 +303,8 @@ class RoundRobinAssigner:
                 # TODO: add player id validation
                 round_matchups.append(Matchup(
                     {
-                        Color.W: [PlayerMatch(p) for p in self.tournament.players if p.id == matchup_player_ids[0]][0],
-                        Color.B: [PlayerMatch(p) for p in self.tournament.players if p.id == matchup_player_ids[1]][0],
+                        Color.W: [PlayerMatch(p) for p in self.tournament.players if p.identifier == matchup_player_ids[0]][0],
+                        Color.B: [PlayerMatch(p) for p in self.tournament.players if p.identifier == matchup_player_ids[1]][0],
                     }
                 ))
             self.tournament.rounds.append(Round(round_matchups, i+1))

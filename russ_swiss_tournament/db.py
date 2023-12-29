@@ -37,7 +37,7 @@ class Database:
 
     def get_player_by_id(self, id) -> Player:
         try:
-            match = [p for p in self.players if p.id == id][0]
+            match = [p for p in self.players if p.identifier == id][0]
         except IndexError:
             raise IndexError(f"No player was found in the database with id {id}")
         return match

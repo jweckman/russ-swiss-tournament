@@ -28,15 +28,15 @@ def modified_median_solkoff_model_scores(rounds, player_ids):
                 winner_color, loser_color = winner_loser_colors
 
             if is_walkover:
-                pms[m.res[winner_color].player.id] += res_valuation[
+                pms[m.res[winner_color].player.identifier] += res_valuation[
                     MatchResult.WALKOVER
                 ]
-                pms[m.res[loser_color].player.id] += res_valuation[
+                pms[m.res[loser_color].player.identifier] += res_valuation[
                     MatchResult.LOSS
                 ]
             else:
                 for color, player_match in m.res.items():
-                    pms[player_match.player.id] += res_valuation[player_match.res]
+                    pms[player_match.player.identifier] += res_valuation[player_match.res]
 
     return pms
 

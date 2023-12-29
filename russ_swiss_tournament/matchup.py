@@ -44,8 +44,8 @@ class Matchup:
         if isinstance(selves[0], int):
             is_ids = True
         session = next(get_session())
-        ids = [t.id for t in selves] if not is_ids else selves
-        existing_db = [t for t in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
+        ids = [m.id for m in selves] if not is_ids else selves
+        existing_db = [m for m in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
         if len(existing_db) != len(selves):
             raise ValueError(
                 f"Trying to create {cls.__name__} from db records but some ids are missing.\n"
@@ -54,8 +54,8 @@ class Matchup:
         objects: list = []
         for record in existing_db:
             matchup = {
-                Color.W: PlayerMatch(Player.from_db(record.white_id)[0][0], MatchResult(record.white_result)),
-                Color.B: PlayerMatch(Player.from_db(record.black_id)[0][0], MatchResult(record.black_result))
+                Color.W: PlayerMatch(Player.from_db([record.white_identifier])[1][0], MatchResult(record.white_score)),
+                Color.B: PlayerMatch(Player.from_db([record.black_identifier])[1][0], MatchResult(record.black_score))
             }
             objects.append(
                 Matchup(
@@ -81,13 +81,14 @@ class Matchup:
             # if t_obj.res[Color.W].player.id == 72:
             #     breakpoint()
             if t_obj.id in existing_db_ids:
+                # TODO: FIX MATCHUP DUPLICATION AND THEN ENABLE UPDATING
                 print('WARNING: creating matchup with already existing id, new record created instead of updating')
                 if update:
                     pass  # TODO
             # else:
             new_record = MatchupModel(
-                white_id = t_obj.res[Color.W].player.id,
-                black_id = t_obj.res[Color.B].player.id,
+                white_identifier = t_obj.res[Color.W].player.identifier,
+                black_identifier = t_obj.res[Color.B].player.identifier,
                 white_score = t_obj.res[Color.W].res.value,
                 black_score = t_obj.res[Color.B].res.value,
             )
@@ -161,5 +162,5 @@ class Matchup:
         return winner_loser_colors, is_walkover
 
     def get_player_ids(self):
-        return self.res[Color.W].player.id, self.res[Color.B].player.id
+        return self.res[Color.W].player.identifier, self.res[Color.B].player.identifier
 

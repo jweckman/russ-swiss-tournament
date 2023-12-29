@@ -119,6 +119,33 @@ class Tournament:
         return new_records
 
     @classmethod
+    def from_db(
+            cls,
+            selves: list[Self] | list[int],
+        ) -> Self:
+        '''Writes/updates selves to db'''
+        session = next(get_session())
+        is_ids = False
+        if isinstance(selves[0], int):
+            is_ids = True
+        ids = [t.id for t in selves] if not is_ids else selves
+        tournament_model = [t for t in session.exec(select(TournamentModel).where(col(TournamentModel.id).in_(ids)))][0]
+        tournament = Tournament(
+            id = tournament_model.id,
+            name = tournament_model.name,
+            players = [], # TODO: instantiate players 
+            rounds = Round.from_db([r.index for r in tournament_model.rounds])[0],
+            round_count = tournament_model.round_count,
+            round_system = RoundSystem.SWISS,
+            tie_break_results_swiss = dict(),
+            tie_break_results_round_robin = dict(),
+            year = tournament_model.year,
+            count = 30,  # TODO hard coded,
+        )
+        return tournament
+
+
+    @classmethod
     def create_players(cls, ids, first_names = None, last_names = None):
         players = []
         if ids and not all([first_names, last_names]):
@@ -157,7 +184,7 @@ class Tournament:
         if create_players:
             players = cls.create_players(player_ids)
         elif db:
-            players = Player.from_db(player_ids)[0]
+            players = Player.from_db(player_ids)[1]
         if read_rounds:
             rounds = cls.read_rounds(round_path, players)
         swiss_tie_break = config['general'].get('tie_break_methods_swiss')
@@ -196,7 +223,7 @@ class Tournament:
     def calculate_tie_break_results_swiss(self):
         mm, solk = tie_break.calc_modified_median_solkoff(
             self.rounds[:self.get_last_complete_round_index()],
-            [p.id for p in self.players],
+            [p.identifier for p in self.players],
             self.get_opponents()
         )
         self.tie_break_results_swiss[tie_break.TieBreakMethodSwiss.MODIFIED_MEDIAN] = mm
@@ -220,7 +247,7 @@ class Tournament:
         Possible to get unplayed by setting inverse boolean to True.
         '''
         # TODO: add validation if faced twice
-        player_ids = [p.id for p in self.players]
+        player_ids = [p.identifier for p in self.players]
         if until == 'latest':
             index = len(self.rounds)
         else:
@@ -244,7 +271,7 @@ class Tournament:
             defeated players ids in the first one and drawn in the second.
         2.  dict with player id as key and dict containins match results by opponent.
         '''
-        player_ids = [p.id for p in self.players]
+        player_ids = [p.identifier for p in self.players]
         pdd = dict(zip(list(player_ids), [[[],[]] for i in range(len(player_ids))]))
         pdd_scores = dict(zip(list(player_ids), [dict() for i in range(len(player_ids))]))
         for r in self.rounds[:self.get_last_complete_round_index()]:
@@ -265,7 +292,7 @@ class Tournament:
 
 
     def get_player_color_counts(self, until: str | int ='latest') -> dict[int,list[int]]:
-        player_ids = [p.id for p in self.players]
+        player_ids = [p.identifier for p in self.players]
         if until == 'latest':
             index = len(self.rounds)
         else:
@@ -310,8 +337,8 @@ class Tournament:
                 res = dict(Counter(res)+Counter(r.get_results()))
         res = {k: v for k, v in sorted(res.items(), key=lambda item: item[1], reverse=True)}
         for p in self.players:
-            if p.id not in res:
-                res[p.id] = 0
+            if p.identifier not in res:
+                res[p.identifier] = 0
         return res
 
     def validate_no_incomplete_match_results_in_rounds(self):
@@ -350,6 +377,14 @@ class Tournament:
         else:
             return None
 
+    def get_round_by_index(self, index: int) -> Round | None:
+        try:
+            round = self.rounds[index - 1]
+        except IndexError:
+            print(f"Warning: Tried to access round index {index} that does not exist")
+            return None
+        return round
+
     def _create_initial_round(self):
         # Players list should already be orderd by rank
         middle_index=len(self.players)//2
@@ -359,7 +394,7 @@ class Tournament:
             matchups.append(Matchup({Color.W: PlayerMatch(second[i]),Color.B: PlayerMatch(p)}))
         self.rounds.append(Round(matchups, index = 1))
 
-    def get_player_matchups(self, player_id):
+    def get_player_matchups(self, player_id: str | int):
         player_matchups = []
         for r in self.rounds:
             player_matchups.append(r.get_player_matchup(player_id))

@@ -34,7 +34,7 @@ def standings(t: Tournament, player_id = None):
             print(f"Could not get standings, reason: {e}")
             return
 
-        full_names = {p.id: p.get_full_name() for p in t.players}
+        full_names = {p.identifier: p.get_full_name() for p in t.players}
         tie_breaks = t.tie_break_results_round_robin
         for k,v in s.items():
             n = full_names[k]

@@ -113,7 +113,7 @@ class Round:
                 Round(
                     id = record. id,
                     index = record.index,
-                    matchups = Matchup.from_db(record.matchups)
+                    matchups = Matchup.from_db(record.matchups)[0]
                 )
             )
         if not objects:
@@ -125,7 +125,7 @@ class Round:
         res = None
         sanitized = s.lower().strip()
         for p in players:
-            if (sanitized.isdigit() and str(p.id) == sanitized
+            if (sanitized.isdigit() and str(p.identifier) == sanitized
                     or p.get_full_name().lower().strip() == sanitized):
                 res = p
                 break
@@ -175,10 +175,10 @@ class Round:
                 player_ids.add(p)
         return player_ids
 
-    def get_player_matchup(self, player_id):
+    def get_player_matchup(self, player_id: int | str):
         for m in self.matchups:
-            player_ids = [pm.player.id for pm in m.res.values()]
-            if player_id in player_ids:
+            player_ids = [str(pm.player.identifier) for pm in m.res.values()]
+            if str(player_id) in player_ids:
                 return m
 
     def write_csv(

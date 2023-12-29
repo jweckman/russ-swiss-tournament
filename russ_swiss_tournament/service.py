@@ -24,6 +24,7 @@ match_result_manual_map = {
     None: MatchResult.UNSET,
     "": MatchResult.UNSET,
     False: MatchResult.UNSET,
+    "unset": MatchResult.UNSET,
 }
 
 match_result_score_map = {
