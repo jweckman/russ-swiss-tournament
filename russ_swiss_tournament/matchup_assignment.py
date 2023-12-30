@@ -182,9 +182,9 @@ class SwissAssigner:
                     return True
         return False
 
-    def create_next_round(self):
+    def create_next_round(self) -> Round:
         if not self.tournament.rounds:
-            self.tournament._create_initial_round()
+            new_round = self.tournament._create_initial_round()
         else:
             self.players_standing_sort = list(reversed(
                 {k: v for k, v in sorted(self.tournament.get_standings().items(), key=lambda item: item[1])}.keys()
@@ -205,14 +205,15 @@ class SwissAssigner:
                         }
                     )
                 )
-            self.tournament.rounds.append(
-                Round(
-                    matchups,
-                    index = self.tournament.rounds[-1].index + 1),
+            new_round = Round(
+                matchups,
+                index = self.tournament.rounds[-1].index + 1,
             )
+            self.tournament.rounds.append(new_round)
             # Make sure there are no unevenly assigned matchups
             assert all([len(v) == len(self.tournament.rounds) for v in self.tournament.get_opponents().values()])
             self.tournament.validate_no_duplicate_matchups()
+        return new_round
 
 class RoundRobinAssigner:
     def __init__(
@@ -284,8 +285,8 @@ class RoundRobinAssigner:
             for matchup in round:
                 r.append(
                     (
-                        self.tournament.players[matchup[0] - 1].id,
-                        self.tournament.players[matchup[1] - 1].id)
+                        self.tournament.players[matchup[0] - 1].identifier,
+                        self.tournament.players[matchup[1] - 1].identifier)
                 )
             brpid.append(r)
         return brpid

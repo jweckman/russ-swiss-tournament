@@ -8,6 +8,7 @@ from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.db import Database
 from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
+from config import tournament
 
 from htmx.db import get_session
 from htmx.models import TournamentModel, RoundModel
@@ -53,7 +54,7 @@ class Round:
             id: int = -1,
         ):
         if id == -1:
-            self.id = next(self.id_iter)
+            self.id = next(self.id_iter) + 1
         else:
             self.id = id
         self.matchups = matchups
@@ -67,26 +68,27 @@ class Round:
         ):
         '''Writes/updates selves to db'''
         session = next(get_session())
-        ids = [r.id for r in selves]
+        ids = [r.index for r in selves]
         existing_db = [r for r in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
-        existing_db_ids = [r.id for r in existing_db]
+        existing_db_ids = [r.index for r in existing_db]
 
         new_records: list[RoundModel] = []
-        for t_obj in selves:
-            if t_obj.id in existing_db_ids:
+        for r_obj in selves:
+            if r_obj.index in existing_db_ids:
                 if update:
                     pass  # TODO
             else:
                 new_record = RoundModel(
-                    index = t_obj.index,
-                    matchups = Matchup.db_write(t_obj.matchups),
+                    index = r_obj.index,
+                    matchups = Matchup.db_write(r_obj.matchups),
+                    tournament_id = 1,  # TODO: hard coded
                 )
                 session.add(new_record)
                 session.flush()
                 session.refresh(new_record)
                 if new_record.id is None:
                     raise ValueError("Trying to create a matchup without an id")
-                t_obj.id = new_record.id
+                r_obj.id = new_record.id
                 session.commit()
                 new_records.append(new_record)
         return new_records
@@ -100,7 +102,7 @@ class Round:
         if isinstance(selves[0], int):
             is_ids = True
         session = next(get_session())
-        ids = [t.id for t in selves] if not is_ids else selves
+        ids = [t.index for t in selves] if not is_ids else selves
         existing_db = [t for t in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
         if len(existing_db) != len(selves):
             raise ValueError(
@@ -111,7 +113,7 @@ class Round:
         for record in existing_db:
             objects.append(
                 Round(
-                    id = record. id,
+                    id = record.id,
                     index = record.index,
                     matchups = Matchup.from_db(record.matchups)[0]
                 )
@@ -147,7 +149,7 @@ class Round:
                 black_player = cls.match_player(line[2], players)
                 if (white_player is None
                         or black_player is None
-                        or any([pid not in [x.id for x in players] for pid in [white_player.id, black_player.id]])):
+                        or any([pid not in [x.identifier for x in players] for pid in [white_player.identifier, black_player.identifier]])):
                     raise ValueError(
                         f"Could not match player {line[0]} or player {line[2]} "
                         "based on id or full name. Check exact typing from database"
@@ -163,14 +165,14 @@ class Round:
         player_ids = self.get_player_ids()
         results = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
         for m in self.matchups:
-            results[m.res[Color.W].player.id] = match_result_score_map[m.res[Color.W].res]
-            results[m.res[Color.B].player.id] = match_result_score_map[m.res[Color.B].res]
+            results[m.res[Color.W].player.identifier] = match_result_score_map[m.res[Color.W].res]
+            results[m.res[Color.B].player.identifier] = match_result_score_map[m.res[Color.B].res]
         return results
 
     def get_player_ids(self):
         player_ids = set()
         for m in self.matchups:
-            rps = [p.player.id for p in m.res.values()]
+            rps = [p.player.identifier for p in m.res.values()]
             for p in rps:
                 player_ids.add(p)
         return player_ids
@@ -194,11 +196,11 @@ class Round:
             rows = []
             for m in self.matchups:
                 if db:
-                    white = db.get_player_by_id(m.res[Color.W].player.id).get_full_name()
-                    black = db.get_player_by_id(m.res[Color.B].player.id).get_full_name()
+                    white = db.get_player_by_id(m.res[Color.W].player.identifier).get_full_name()
+                    black = db.get_player_by_id(m.res[Color.B].player.identifier).get_full_name()
                 else:
-                    white = m.res[Color.W].player.id
-                    black = m.res[Color.B].player.id
+                    white = m.res[Color.W].player.identifier
+                    black = m.res[Color.B].player.identifier
                 row = [
                     white,
                     match_result_score_text_map[m.res[Color.W].res],

@@ -90,7 +90,6 @@ class Tournament:
         session = next(get_session())
         ids = [t.id for t in selves]
         existing_db = [t for t in session.exec(select(TournamentModel).where(col(TournamentModel.id).in_(ids)))]
-        print(session.exec(select(TournamentModel)).all())
         existing_db_ids = [t.id for t in existing_db]
         new_records: list[TournamentModel] = []
         for t_obj in selves:
@@ -104,7 +103,6 @@ class Tournament:
                     count = t_obj.count,
                     round_count = t_obj.round_count,
                     round_system = t_obj.round_system.value,
-                    # TODO test this out
                     players = Player.db_write(t_obj.players),
                     rounds = Round.db_write(t_obj.rounds),
                 )
@@ -133,7 +131,7 @@ class Tournament:
         tournament = Tournament(
             id = tournament_model.id,
             name = tournament_model.name,
-            players = [], # TODO: instantiate players 
+            players = Player.from_db(tournament_model.players)[0],
             rounds = Round.from_db([r.index for r in tournament_model.rounds])[0],
             round_count = tournament_model.round_count,
             round_system = RoundSystem.SWISS,
@@ -150,7 +148,7 @@ class Tournament:
         players = []
         if ids and not all([first_names, last_names]):
             for i, id in enumerate(ids):
-                players.append(Player(id, f"p{i}f", f"p{i}l"))
+                players.append(Player(identifier=id, first_name=f"p{i}f", last_name=f"p{i}l"))
         else:
             # TODO: allow creating based on names as well
             pass
@@ -176,19 +174,19 @@ class Tournament:
             db = None
         ):
         with open(path, mode="rb") as fp:
-            config = tomli.load(fp)
-        round_path = Path().cwd() / 'tournaments' / config['general']['folder'] / config['general']['round_folder']
+            toml_conf = tomli.load(fp)
+        round_path = Path().cwd() / 'tournaments' / toml_conf['general']['folder'] / toml_conf['general']['round_folder']
 
         rounds = []
-        player_ids = config['players']['ids']
+        player_ids = toml_conf['players']['ids']
         if create_players:
             players = cls.create_players(player_ids)
         elif db:
             players = Player.from_db(player_ids)[1]
         if read_rounds:
             rounds = cls.read_rounds(round_path, players)
-        swiss_tie_break = config['general'].get('tie_break_methods_swiss')
-        round_robin_tie_break = config['general'].get('tie_break_methods_round_robin')
+        swiss_tie_break = toml_conf['general'].get('tie_break_methods_swiss')
+        round_robin_tie_break = toml_conf['general'].get('tie_break_methods_round_robin')
         try:
             if swiss_tie_break:
                 used_swiss = [getattr(tie_break.TieBreakMethodSwiss, x.upper()) for x in swiss_tie_break]
@@ -204,19 +202,19 @@ class Tournament:
                 f"{', '.join([x.name.lower() for x in tie_break.TieBreakMethodSwiss])}"
                 f", {', '.join([x.name.lower() for x in tie_break.TieBreakMethodRoundRobin])}"
             ) from e
-        rs = getattr(RoundSystem, config['general']['round_system'].upper())
+        rs = getattr(RoundSystem, toml_conf['general']['round_system'].upper())
 
         return cls(
-            name = config['general']['title'],
+            name = toml_conf['general']['title'],
             players = players,
             rounds = rounds,
-            round_count = config['general']['rounds'],
+            round_count = toml_conf['general']['rounds'],
             round_system = rs,
             tie_break_results_swiss = {x: None for x in used_swiss},
             tie_break_results_round_robin = {x: None for x in used_round_robin},
-            year = config['general']['year'],
-            count = config['general']['count'],
-            folder = Path().cwd() / 'tournaments' / config['general']['folder'],
+            year = toml_conf['general']['year'],
+            count = toml_conf['general']['count'],
+            folder = Path().cwd() / 'tournaments' / toml_conf['general']['folder'],
             round_folder = round_path
         )
 
@@ -255,8 +253,8 @@ class Tournament:
         results = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
         for r in self.rounds[:index]:
             for m in r.matchups:
-                results[m.res[Color.W].player.id].append(m.res[Color.B].player.id)
-                results[m.res[Color.B].player.id].append(m.res[Color.W].player.id)
+                results[m.res[Color.W].player.identifier].append(m.res[Color.B].player.identifier)
+                results[m.res[Color.B].player.identifier].append(m.res[Color.W].player.identifier)
         if inverse:
             for player, opponents in results.copy().items():
                 players_minus_self = [p for p in player_ids if p != player]
@@ -279,15 +277,15 @@ class Tournament:
                 score_white = match_result_score_map[m.res[Color.W].res]
                 score_black = match_result_score_map[m.res[Color.B].res]
                 if score_white == 1:
-                    pdd[m.res[Color.W].player.id][0].append(m.res[Color.B].player.id)
+                    pdd[m.res[Color.W].player.identifier][0].append(m.res[Color.B].player.identifier)
                 if score_white == 0.5:
-                    pdd[m.res[Color.W].player.id][1].append(m.res[Color.B].player.id)
-                pdd_scores[m.res[Color.W].player.id][m.res[Color.B].player.id] = score_white
+                    pdd[m.res[Color.W].player.identifier][1].append(m.res[Color.B].player.identifier)
+                pdd_scores[m.res[Color.W].player.identifier][m.res[Color.B].player.identifier] = score_white
                 if score_black == 1:
-                    pdd[m.res[Color.B].player.id][0].append(m.res[Color.W].player.id)
+                    pdd[m.res[Color.B].player.identifier][0].append(m.res[Color.W].player.identifier)
                 if score_white == 0.5:
-                    pdd[m.res[Color.B].player.id][1].append(m.res[Color.W].player.id)
-                pdd_scores[m.res[Color.B].player.id][m.res[Color.W].player.id] = score_black
+                    pdd[m.res[Color.B].player.identifier][1].append(m.res[Color.W].player.identifier)
+                pdd_scores[m.res[Color.B].player.identifier][m.res[Color.W].player.identifier] = score_black
         return pdd, pdd_scores
 
 
@@ -301,8 +299,8 @@ class Tournament:
         # TODO: handle walkover not counting
         for r in self.rounds[:index]:
             for m in r.matchups:
-                results[m.res[Color.W].player.id][0] += 1
-                results[m.res[Color.B].player.id][1] += 1
+                results[m.res[Color.W].player.identifier][0] += 1
+                results[m.res[Color.B].player.identifier][1] += 1
         return results
 
     def get_standings(
@@ -392,7 +390,9 @@ class Tournament:
         matchups = []
         for i, p in enumerate(first):
             matchups.append(Matchup({Color.W: PlayerMatch(second[i]),Color.B: PlayerMatch(p)}))
-        self.rounds.append(Round(matchups, index = 1))
+        new_round = Round(matchups, index = 1)
+        self.rounds.append(new_round)
+        return new_round
 
     def get_player_matchups(self, player_id: str | int):
         player_matchups = []

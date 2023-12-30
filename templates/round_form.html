@@ -10,13 +10,12 @@
       <div class="flex">
         <select
           id="matchup_input_{{m.white_identifier}}"
-          selected="{{m.white_score|default('unset')}}"
           _="on change put white_black_result_map[me.value] into #matchup_result_black_{{m.black_identifier}} then put white_black_result_map[me.value] into #matchup_result_black_{{m.black_identifier}}_input.value"
           name="matchup_input_{{m.white_identifier}}">
-            <option value="unset">unset</option>
-            <option value="1">1</option>
-            <option value="0">0</option>
-            <option value="0.5">0.5</option>
+            <option value="unset" {{'selected' if (m.white_score|default('unset')) == 'unset'}}>unset</option>
+            <option value="1" {{'selected' if (m.white_score|default('unset')) == 1}}>1</option>
+            <option value="0" {{'selected' if (m.white_score|default('unset')) == 0}}>0</option>
+            <option value="0.5" {{'selected' if (m.white_score|default('unset')) == 0.5}}>0.5</option>
         </select>
       </div>
       <div class="basis-1/6">
@@ -35,10 +34,28 @@
       </div>
     </div>
     {% endfor %}
-    <input type="submit" value="Submit">
+    <input
+      _="on click if #round-status.innerHTML matches 'finished' then remove .invisible from #generate-round"
+        log #round-status.innerHTML"
+      type="submit"
+      value="Submit"
+    >
     </div>
   </form>
-  <p id="round-status">{{'in progress' if not is_complete else  'finished'}}</p>
+  <p
+    _="on change log me.innerHTML then if me.innerHTML is 'finished' then remove .invisible from #generate-round"
+    id="round-status"
+    >{{'in progress' if not is_complete else  'finished'}}
+  </p>
+  <button
+    id="generate-round"
+    class="invisible"
+    hx-get="/generate_round/{{round_id + 1}}"
+    hx-trigger="click"
+    hx-swap="outerHTML"
+  >
+    Generate Next Round
+  </button>
 </div>
 
 <script>

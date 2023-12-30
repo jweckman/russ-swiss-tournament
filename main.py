@@ -61,16 +61,14 @@ def initialize_from_db():
     t = Tournament.from_db(
         [1]
     )
-    if not t.players:
-        t.players = Player.from_db([], all = True)[0]
     return t
 
 # config.tournament = generate_round_robin_rounds()
 
 # config.tournament = generate_first_swiss_round()
 
-
 config.tournament = initialize_from_db()
+config.assigner = SwissAssigner(config.tournament)
 init_htmx()
 
 if __name__ == "__main__":

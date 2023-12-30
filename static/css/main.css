@@ -571,6 +571,10 @@ button:hover,
   background-color: rgb(55 65 81 / var(--tw-bg-opacity));
 }
 
+.invisible {
+  visibility: hidden;
+}
+
 .static {
   position: static;
 }

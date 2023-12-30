@@ -1,1 +1,2 @@
 tournament = None
+assigner = None

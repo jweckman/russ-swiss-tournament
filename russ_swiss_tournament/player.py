@@ -26,7 +26,7 @@ class Player:
         return f"{self.first_name} {self.last_name}"
 
     def __repr__(self):
-        return f"[{self.id}]{self.get_full_name()}"
+        return f"[{self.identifier}]{self.get_full_name()}"
 
     @classmethod
     def from_db(
@@ -70,9 +70,11 @@ class Player:
         ids = [p.identifier for p in selves]
         existing_db = [t for t in session.exec(select(PlayerModel).where(col(PlayerModel.identifier).in_(ids)))]
         existing_db_ids = [t.identifier for t in existing_db]
-        new_records: list[PlayerModel] = []
+        records: list[PlayerModel] = []
         for t_obj in selves:
             if t_obj.identifier in existing_db_ids:
+                player_model = existing_db[existing_db_ids.index(t_obj.identifier)]
+                records.append(player_model)
                 if update:
                     pass  # TODO
             else:
@@ -89,8 +91,9 @@ class Player:
                     raise ValueError("Trying to create a player without an id")
                 t_obj.identifier = new_record.identifier
                 session.commit()
-                new_records.append(new_record)
-        return new_records
+                records.append(new_record)
+        session.close()
+        return records
 
     @classmethod
     def read_players_from_csv(

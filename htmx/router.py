@@ -16,6 +16,8 @@ from htmx.models import PlayerModel, RoundModel, TournamentModel
 
 from russ_swiss_tournament.service import match_result_score_map, MatchResult, Color, match_result_manual_map
 from russ_swiss_tournament.matchup import Matchup
+from russ_swiss_tournament.round import Round
+from russ_swiss_tournament.matchup_assignment import SwissAssigner
 
 templates = Jinja2Templates(directory="templates")
 
@@ -56,7 +58,7 @@ async def round_input(
         if black_full_name and len(black_full_name) == 1:
             matchup['black_full_name'] = black_full_name[0].get_full_name()
         matchup['white_score'] = match_result_score_map[MatchResult(matchup_data.white_score)]
-        matchup['black_score'] = match_result_score_map[MatchResult(matchup_data.white_score)]
+        matchup['black_score'] = match_result_score_map[MatchResult(matchup_data.black_score)]
         matchup['white_identifier'] = matchup_data.white_identifier
         matchup['black_identifier'] = matchup_data.black_identifier
         matchups.append(matchup)
@@ -92,9 +94,9 @@ async def round_update(
             matchup.res[Color.B].res = match_result_manual_map[result]
         else:
             matchup.res[Color.W].res = match_result_manual_map[result]
-        matchups.append(matchup)
-    # TODO: fix matchup update to db
-    Matchup.db_write(matchups)
+        if matchup.id not in [m.id for m in matchups]:
+            matchups.append(matchup)
+    Matchup.db_write(matchups, update=True)
 
     config.tournament.validate_no_incomplete_match_results_in_rounds()
 
@@ -109,3 +111,17 @@ async def round_update(
         "status": "finished" if is_complete else "in progress"
     }
     return templates.TemplateResponse("round_status.html", context)
+
+
+@router.get("/generate_round/{round_id}")
+async def round_generate(
+        round_id: int,
+        request: Request,
+        session: Session = Depends(get_session),
+    ):
+    prev_round: Round = config.tournament.get_round_by_index(round_id - 1)
+    if not isinstance(config.assigner, SwissAssigner):
+        raise ValueError("Can only generate new round with SwissAssigner mapped to config")
+    new_round: Round = config.assigner.create_next_round()
+    Round.db_write([new_round])
+

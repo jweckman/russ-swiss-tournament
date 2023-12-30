@@ -23,7 +23,7 @@ class Matchup:
             self,
             res: dict[Color, PlayerMatch],
         ):
-        self.id = next(self.id_iter)
+        self.id = next(self.id_iter) + 1
         self.res = res
 
     @property
@@ -68,39 +68,47 @@ class Matchup:
     def db_write(
             self,
             selves: list[Self],
-            update: bool = True,
+            update: bool = False,
         ) -> list[MatchupModel]:
         '''Writes/updates selves to db'''
         session = next(get_session())
         ids = [m.id for m in selves]
         existing_db = [m for m in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
         existing_db_ids = [m.id for m in existing_db]
-        new_records: list = []
-        for t_obj in selves:
-            # TODO: debug and fix matchup ids being the same
-            # if t_obj.res[Color.W].player.id == 72:
-            #     breakpoint()
-            if t_obj.id in existing_db_ids:
-                # TODO: FIX MATCHUP DUPLICATION AND THEN ENABLE UPDATING
-                print('WARNING: creating matchup with already existing id, new record created instead of updating')
-                if update:
-                    pass  # TODO
-            # else:
-            new_record = MatchupModel(
-                white_identifier = t_obj.res[Color.W].player.identifier,
-                black_identifier = t_obj.res[Color.B].player.identifier,
-                white_score = t_obj.res[Color.W].res.value,
-                black_score = t_obj.res[Color.B].res.value,
+        if existing_db and not update:
+            raise ValueError(
+                "Writing existing ids to db without update flag enabled. Terminating."
             )
-            session.add(new_record)
-            session.flush()
-            session.refresh(new_record)
-            if new_record.id is None:
-                raise ValueError("Trying to create a matchup without an id")
-            t_obj.id = new_record.id
-            session.commit()
-            new_records.append(new_record)
-        return new_records
+        if update and len(existing_db_ids) != len(ids):
+            raise ValueError(
+                "Trying to update and create matchup model at the same time which is not allowed.\n"
+                f"Trying to create: {[id for id in ids if id not in existing_db_ids]}"
+            )
+        db_records: list = []
+        for t_obj in selves:
+            if t_obj.id in existing_db_ids:
+                matchup_model = existing_db[existing_db_ids.index(t_obj.id)]
+                matchup_model.white_score = t_obj.res[Color.W].res.value
+                matchup_model.black_score = t_obj.res[Color.B].res.value
+                session.add(matchup_model)
+                session.commit()
+                session.refresh(matchup_model)
+            else:
+                new_record = MatchupModel(
+                    white_identifier = t_obj.res[Color.W].player.identifier,
+                    black_identifier = t_obj.res[Color.B].player.identifier,
+                    white_score = t_obj.res[Color.W].res.value,
+                    black_score = t_obj.res[Color.B].res.value,
+                )
+                session.add(new_record)
+                session.flush()
+                session.refresh(new_record)
+                if new_record.id is None:
+                    raise ValueError("Trying to create a matchup without an id")
+                t_obj.id = new_record.id
+                session.commit()
+                db_records.append(new_record)
+        return db_records
 
     def __str__(self):
         white = self.res[Color.W]
