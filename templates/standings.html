@@ -1,0 +1,21 @@
+<p class="text-lg text-center">Standings</p>
+<div class="p-3">
+  {% for s in standings %}
+    <div class="flex gap-2">
+      <div class="basis-2/12">
+        <button hx-get="/player_rounds_modal/{{s.identifier}}" hx-target="body" hx-swap="beforeend">{{s.name}}</button>
+      </div>
+      <div class="flex"></div>
+      <div class="basis-20">
+        <p>{{s.score}}</p>
+      </div>
+      {% if s['tie_breaks'] %}
+        {% for tb_name, tb_value in s.tie_breaks.items() %}
+          <div class="basis-5">
+            <p>{{tb_value}}</p>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>

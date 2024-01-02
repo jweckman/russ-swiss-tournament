@@ -1,6 +1,6 @@
 <div>
   <form class="bg-gray-100" hx-post="/round_update/{{round_id}}" hx-target="#round-status" hx-swap="innerHTML">
-    <p class="text-lg">Fill in round results for round: {{round_id}}</p>
+    <p class="text-lg text-center">Fill in round results for round: {{round_id}}</p>
     <div class="p-3">
     {% for m in matchups %}
     <div class="flex gap-2">
@@ -22,15 +22,15 @@
         <p id="matchup_full_name_black_{{m.black_identifier}}">{{m.black_full_name}}</p>
       </div>
       <div class="flex">
-          <p
-            id="matchup_result_black_{{m.black_identifier}}">{{m.black_score|default('unset')}}
-          </p>
-          <input
-            id="matchup_result_black_{{m.black_identifier}}_input"
-            type="hidden"
-            name="matchup_result_black_{{m.black_identifier}}"
-            value="{{m.black_score|default('unset')}}"
-          />
+        <p
+          id="matchup_result_black_{{m.black_identifier}}">{{m.black_score|default('unset')}}
+        </p>
+        <input
+          id="matchup_result_black_{{m.black_identifier}}_input"
+          type="hidden"
+          name="matchup_result_black_{{m.black_identifier}}"
+          value="{{m.black_score|default('unset')}}"
+        />
       </div>
     </div>
     {% endfor %}
@@ -43,7 +43,7 @@
     </div>
   </form>
   <p
-    _="on change log me.innerHTML then if me.innerHTML is 'finished' then remove .invisible from #generate-round"
+    _="on change if me.innerHTML matches 'finished' then remove .invisible from #generate-round"
     id="round-status"
     >{{'in progress' if not is_complete else  'finished'}}
   </p>

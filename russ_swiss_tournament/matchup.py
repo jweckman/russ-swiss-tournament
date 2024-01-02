@@ -1,7 +1,7 @@
 from enum import Enum
 from dataclasses import dataclass
 import itertools
-from typing import Self
+from typing import Self, Any
 
 from sqlmodel import select, col
 
@@ -62,6 +62,7 @@ class Matchup:
                     res = matchup,
                 )
             )
+        session.close()
         return objects, existing_db
 
     @classmethod
@@ -108,13 +109,14 @@ class Matchup:
                 t_obj.id = new_record.id
                 session.commit()
                 db_records.append(new_record)
+        session.close()
         return db_records
 
     def __str__(self):
         white = self.res[Color.W]
         black = self.res[Color.B]
-        white_name = white.player.get_full_name() or white.player.id
-        black_name = black.player.get_full_name() or white.player.id
+        white_name = white.player.get_full_name() or white.player.identifier
+        black_name = black.player.get_full_name() or white.player.identifier
         res_white = match_result_score_text_map[white.res]
         res_black = match_result_score_text_map[black.res]
         w = f"{white_name.ljust(20)} {str(res_white).ljust(2)}"
@@ -172,3 +174,15 @@ class Matchup:
     def get_player_ids(self):
         return self.res[Color.W].player.identifier, self.res[Color.B].player.identifier
 
+    def to_dict(self) -> dict[str, Any]:
+        # TODO: make sure that matchup.res.player is Player and not PlayerModel!
+        res = dict()
+        white = self.res[Color.W]
+        black = self.res[Color.B]
+        res['white_identifier'] = white.player.identifier
+        res['black_identifier'] = black.player.identifier
+        res['white_name'] = white.player.get_full_name()
+        res['black_name'] = black.player.get_full_name()
+        res['white_score'] = match_result_score_text_map[white.res]
+        res['black_score'] = match_result_score_text_map[black.res]
+        return res

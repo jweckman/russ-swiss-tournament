@@ -52,3 +52,17 @@ def split_list(input_list,n):
     first_half=input_list[:n]
     sec_half=input_list[n:]
     return first_half,sec_half
+
+def matchup_to_dict(matchup, players):
+    matchup = dict()
+    white_full_name = [p for p in players if p.identifier == matchup.white_identifier]
+    if white_full_name and len(white_full_name) == 1:
+        matchup['white_full_name'] = white_full_name[0].get_full_name()
+    black_full_name = [p for p in players if p.identifier == matchup.black_identifier]
+    if black_full_name and len(black_full_name) == 1:
+        matchup['black_full_name'] = black_full_name[0].get_full_name()
+    matchup['white_score'] = match_result_score_map[MatchResult(matchup.white_score)]
+    matchup['black_score'] = match_result_score_map[MatchResult(matchup.black_score)]
+    matchup['white_identifier'] = matchup.white_identifier
+    matchup['black_identifier'] = matchup.black_identifier
+    return matchup

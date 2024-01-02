@@ -177,11 +177,12 @@ class Round:
                 player_ids.add(p)
         return player_ids
 
-    def get_player_matchup(self, player_id: int | str):
+    def get_player_matchup(self, player_id: int | str) -> None | Matchup:
         for m in self.matchups:
             player_ids = [str(pm.player.identifier) for pm in m.res.values()]
             if str(player_id) in player_ids:
                 return m
+        return None
 
     def write_csv(
             self,

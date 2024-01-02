@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 from datetime import datetime, timedelta, date
 
 from fastapi import FastAPI, Depends, Request, Query, Form, APIRouter
@@ -17,6 +17,7 @@ from htmx.models import PlayerModel, RoundModel, TournamentModel
 from russ_swiss_tournament.service import match_result_score_map, MatchResult, Color, match_result_manual_map
 from russ_swiss_tournament.matchup import Matchup
 from russ_swiss_tournament.round import Round
+from russ_swiss_tournament.tournament import Tournament
 from russ_swiss_tournament.matchup_assignment import SwissAssigner
 
 templates = Jinja2Templates(directory="templates")
@@ -125,3 +126,52 @@ async def round_generate(
     new_round: Round = config.assigner.create_next_round()
     Round.db_write([new_round])
 
+@router.get("/standings")
+async def standings_get(
+        request: Request,
+        session: Session = Depends(get_session),
+    ):
+    res: list = []
+    t: Tournament = config.tournament
+    t.calculate_tie_break_results_swiss()
+    s = t.get_standings()
+    full_names = {p.identifier: p.get_full_name() for p in t.players}
+    tie_breaks = t.tie_break_results_swiss
+    for id, score in s.items():
+        name = full_names[id]
+        info: dict[str, Any] = {'name': name}
+        if isinstance(score, float):
+            if score.is_integer():
+                score = int(score)
+        info['identifier'] = id
+        info['score'] = score
+        info['tie_breaks'] = dict()
+        if tie_breaks:
+            for tb, trs in tie_breaks.items():
+                info['tie_breaks'][tb.name] = trs[id]
+        res.append(info)
+
+    context = {
+        "request": request,
+        "standings": res,
+    }
+    return templates.TemplateResponse("standings.html", context)
+
+@router.get("/player_rounds_modal/{player_identifier}")
+async def player_rounds_modal(
+        player_identifier: int,
+        request: Request,
+        session: Session = Depends(get_session),
+    ):
+    res: list[dict] = []
+    t: Tournament = config.tournament
+    for round in t.rounds:
+        mu = round.get_player_matchup(player_identifier)
+        if mu:
+            res.append(mu.to_dict())
+
+    context = {
+        "request": request,
+        "matchups": res,
+    }
+    return templates.TemplateResponse("player_rounds_modal.html", context)

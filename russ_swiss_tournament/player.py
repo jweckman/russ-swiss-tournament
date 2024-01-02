@@ -57,6 +57,7 @@ class Player:
                     last_name = record.last_name,
                 )
             )
+        session.close()
         return objects, existing_db
 
     @classmethod
