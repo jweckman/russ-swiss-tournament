@@ -18,6 +18,7 @@ from russ_swiss_tournament.service import match_result_score_map, MatchResult, C
 from russ_swiss_tournament.matchup import Matchup
 from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.tournament import Tournament
+from russ_swiss_tournament.tournament import Player
 from russ_swiss_tournament.matchup_assignment import SwissAssigner
 
 templates = Jinja2Templates(directory="templates")
@@ -165,6 +166,7 @@ async def player_rounds_modal(
     ):
     res: list[dict] = []
     t: Tournament = config.tournament
+    player = t.get_player_by_id(player_identifier)
     for round in t.rounds:
         mu = round.get_player_matchup(player_identifier)
         if mu:
@@ -173,5 +175,6 @@ async def player_rounds_modal(
     context = {
         "request": request,
         "matchups": res,
+        "player_name": player.get_full_name()
     }
     return templates.TemplateResponse("player_rounds_modal.html", context)

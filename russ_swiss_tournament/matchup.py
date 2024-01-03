@@ -54,8 +54,8 @@ class Matchup:
         objects: list = []
         for record in existing_db:
             matchup = {
-                Color.W: PlayerMatch(Player.from_db([record.white_identifier])[1][0], MatchResult(record.white_score)),
-                Color.B: PlayerMatch(Player.from_db([record.black_identifier])[1][0], MatchResult(record.black_score))
+                Color.W: PlayerMatch(Player.from_db([record.white_identifier])[0][0], MatchResult(record.white_score)),
+                Color.B: PlayerMatch(Player.from_db([record.black_identifier])[0][0], MatchResult(record.black_score))
             }
             objects.append(
                 Matchup(
@@ -175,7 +175,6 @@ class Matchup:
         return self.res[Color.W].player.identifier, self.res[Color.B].player.identifier
 
     def to_dict(self) -> dict[str, Any]:
-        # TODO: make sure that matchup.res.player is Player and not PlayerModel!
         res = dict()
         white = self.res[Color.W]
         black = self.res[Color.B]

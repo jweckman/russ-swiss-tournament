@@ -400,3 +400,10 @@ class Tournament:
             player_matchups.append(r.get_player_matchup(player_id))
         return player_matchups
 
+    def get_player_by_id(self, identifier) -> Player:
+        try:
+            player = [p for p in self.players if p.identifier == identifier][0]
+        except IndexError:
+            raise IndexError(f"No player was found in the database with identifier {identifier}")
+        return player
+
