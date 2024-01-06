@@ -1,0 +1,5 @@
+white,score_white,black,score_black
+p b,0.5,draw all,0.5
+p e,0,win all,1
+lose all,0,p a,1
+p c,1,p d,0

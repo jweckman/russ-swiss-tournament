@@ -27,7 +27,7 @@ class Database:
             headers = next(player_reader, None)
             for line in player_reader:
                 player = Player(
-                    id = int(line[0]),
+                    identifier = int(line[0]),
                     first_name = line[3].strip(),
                     last_name = line[2].strip(),
                     active = active_map[line[1].strip().lower()]

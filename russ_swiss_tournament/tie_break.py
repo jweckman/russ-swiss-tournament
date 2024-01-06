@@ -40,13 +40,31 @@ def modified_median_solkoff_model_scores(rounds, player_ids):
 
     return pms
 
-def calc_modified_median_solkoff(rounds:list[Round], player_ids: set, opponents: dict):
+def calc_modified_median_solkoff(rounds: list[Round], player_ids: set, opponents: dict):
     '''
     First calculate model scores for each player.
-    Solkoff is actually Modified Median without filtering
+
+    A player's Modified Median score is found by adding the scores of the player's opponents, but not including the least important
+    of those opponents. The "least important" player is decided as follows:
+
+    For players tied with more than half the maximum score (3 points or higher in a 5 round tournament)
+        --> lowest-ranked opponent is removed from the Modified Median score.
+    For players tied with less than half the maximum score (2 or less in a 5 round tournament)
+        --> highest-ranked opponent is removed from the Modified Median score.
+    For players tied with exactly half the maximum score (2.5 in a 5 round tournament)
+        --> highest and lowest-ranked opponents are removed from the Modified Median score.
+
+    If the tournament has nine or more rounds, then the top and/or bottom two opponents are removed from the Modified Median score.
+
+    For the purposes of determining the Modified Median,
+    any opponent who had an unplayed game (bye, forfeit win, etc) shall have that round counted as 1/2 point
+    towards the tied player's Modified Median, even if it was a full point bye.
+
+    A player's Solkoff score is calculated the same way as the Modified Median, except no scores are dropped.
     '''
     player_model_scores = modified_median_solkoff_model_scores(rounds, player_ids)
 
+    # This contains the scores of the opponents of the player, which is the basis for everything
     player_total_gains = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
 
     for player, ops in opponents.items():

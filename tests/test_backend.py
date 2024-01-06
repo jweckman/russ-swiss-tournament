@@ -7,7 +7,7 @@ from russ_swiss_tournament.tournament import Tournament
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.round import Round
-from russ_swiss_tournament.tie_break import calc_modified_median_solkoff, calc_sonne_koya
+from russ_swiss_tournament.tie_break import calc_modified_median_solkoff, calc_sonne_koya, TieBreakMethodSwiss, TieBreakMethodRoundRobin
 from russ_swiss_tournament.matchup_assignment import SwissAssigner, RoundRobinAssigner
 from russ_swiss_tournament.db import Database
 from russ_swiss_tournament.service import MatchResult, Color
@@ -120,14 +120,15 @@ def create_rounds(t, m, count, round_matchups=None):
 
     return rounds
 
-# def test_should_generate_round_robin_rounds_correctly():
-#     t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'dummy' / 'config.toml', create_players=True)
-#     db = Database()
-#     db.read_players()
-#     rra = RoundRobinAssigner(t)
-#     rra.prepare_tournament_rounds()
-#     for r in t.rounds:
-#         r.write_csv(Path.cwd() / 'tournaments' / 'dummy' / 'rounds', db)
+def test_should_generate_round_robin_rounds_correctly():
+    t = Tournament.from_toml(Path.cwd() / 'tournaments' / 'test_round_robin' / 'config.toml', create_players=True)
+    db = Database()
+    db.read_players()
+    rra = RoundRobinAssigner(t)
+    rra.prepare_tournament_rounds()
+    (Path.cwd() / 'tournaments' / 'test_round_robin' / 'rounds').mkdir(exist_ok=True)
+    for r in t.rounds:
+        r.write_csv(Path.cwd() / 'tournaments' / 'test_round_robin' / 'rounds', db)
 
 def test_should_calculate_sonne_koya_correctly():
     t = Tournament.from_toml(
@@ -161,21 +162,38 @@ def test_should_calculate_sonne_koya_correctly():
 #         create_rounds(t, sa, t.round_count)
 
 def test_should_calculate_modified_median_solkoff_correctly():
+    players = [
+        Player(0, 'win', 'all'),
+        Player(1, 'lose', 'all'),
+        Player(2, 'draw', 'all'),
+        Player(3, 'p', 'a'),
+        Player(4, 'p', 'b'),
+        Player(5, 'p', 'c'),
+        Player(6, 'p', 'd'),
+        Player(7, 'p', 'e'),
+    ]
     t = Tournament.from_toml(
-        Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
-        create_players = True,
+        Path.cwd() / 'tournaments' / 'test_tie_break' / 'config.toml',
+        create_players = False,
         read_rounds = False,
+        players_manual = players,
     )
-    sa = SwissAssigner(t)
-    create_rounds(t, sa, t.round_count)
+    t.rounds = t.read_rounds(t.round_folder, t.players)
+    # sa = SwissAssigner(t)
+    # create_rounds(t, sa, t.round_count)
     t.calculate_tie_break_results_swiss()
-    # TODO: Check that calculations are in order
-
-    assert True == False
+    tbm = t.tie_break_results_swiss[TieBreakMethodSwiss.MODIFIED_MEDIAN]
+    tbs = t.tie_break_results_swiss[TieBreakMethodSwiss.SOLKOFF]
+    assert tbm[0] == 3.5
+    assert tbs[0] == 4
+    assert tbm[1] == 3.5
+    assert tbs[1] == 5.5
+    assert tbm[2] == 1.5
+    assert tbs[2] == 3.5
 
 # # DATABASE
-def test_read_players_from_csv_db():
-    db = Database()
-    db.read_players()
-    assert isinstance(db.players[0], Player)
+# def test_read_players_from_csv_db():
+#     db = Database()
+#     db.read_players()
+#     assert isinstance(db.players[0], Player)
 

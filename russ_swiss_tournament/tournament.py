@@ -171,7 +171,8 @@ class Tournament:
             path,
             read_rounds = True,
             create_players = False,
-            db = None
+            db = None,
+            players_manual = [],
         ):
         with open(path, mode="rb") as fp:
             toml_conf = tomli.load(fp)
@@ -183,6 +184,8 @@ class Tournament:
             players = cls.create_players(player_ids)
         elif db:
             players = Player.from_db(player_ids)[1]
+        elif players_manual:
+            players = players_manual
         if read_rounds:
             rounds = cls.read_rounds(round_path, players)
         swiss_tie_break = toml_conf['general'].get('tie_break_methods_swiss')
