@@ -1,13 +1,13 @@
 <div>
   <form class="bg-gray-100" hx-post="/round_update/{{round_id}}" hx-target="#round-status" hx-swap="innerHTML">
     <p class="text-lg text-center">Fill in round results for round: {{round_id}}</p>
-    <div class="p-3">
+    <div class="p-3 w-9/12 m-auto">
     {% for m in matchups %}
     <div class="flex gap-2">
-      <div class="basis-1/6">
+      <div class="basis-1/6 text-right">
         <label for="matchup_input_{{m.white_identifier}}">{{m.white_full_name}}</label>
       </div>
-      <div class="flex">
+      <div class="flex ml-20">
         <select
           id="matchup_input_{{m.white_identifier}}"
           _="on change put white_black_result_map[me.value] into #matchup_result_black_{{m.black_identifier}} then put white_black_result_map[me.value] into #matchup_result_black_{{m.black_identifier}}_input.value"
@@ -18,11 +18,9 @@
             <option value="0.5" {{'selected' if (m.white_score|default('unset')) == 0.5}}>0.5</option>
         </select>
       </div>
-      <div class="basis-1/6">
-        <p id="matchup_full_name_black_{{m.black_identifier}}">{{m.black_full_name}}</p>
-      </div>
-      <div class="flex">
+      <div class="flex mr-20">
         <p
+          class="w-6"
           id="matchup_result_black_{{m.black_identifier}}">{{m.black_score|default('unset')}}
         </p>
         <input
@@ -32,9 +30,13 @@
           value="{{m.black_score|default('unset')}}"
         />
       </div>
+      <div>
+        <p id="matchup_full_name_black_{{m.black_identifier}}">{{m.black_full_name}}</p>
+      </div>
     </div>
     {% endfor %}
     <input
+      class=""
       _="on click if #round-status.innerHTML matches 'finished' then remove .invisible from #generate-round"
         log #round-status.innerHTML"
       type="submit"
