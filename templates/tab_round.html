@@ -3,7 +3,7 @@
   id="tab-round-{{round.id}}"
   role="tab"
   aria-controls="tab-content"
-  aria-selected="true"
+  aria-selected="{{'true' if is_selected else 'false'}}"
   hx-get="/round_input/{{round.id}}"
   class="{{'selected' if is_selected else ''}}">
     R{{round.id}}

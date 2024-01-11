@@ -25,6 +25,17 @@ templates = Jinja2Templates(directory="templates")
 
 router = APIRouter()
 
+def get_tournament_rounds_data(selected_id=1) -> list[dict[str, Any]]:
+    rounds: list[Round] = config.tournament.rounds
+    rounds_data = []
+    for r in rounds:
+        res: dict[str, Any] = dict()
+        res['id'] = r.id
+        res['is_complete'] = r.is_complete()
+        res['is_selected'] = r.id == selected_id
+        rounds_data.append(res)
+    return rounds_data
+
 @router.get("/")
 async def index(
         *,
@@ -44,14 +55,7 @@ async def load_all_tabs(
         request: Request,
     ):
     # TODO: Add selector for tournaments
-    rounds: list[Round] = config.tournament.rounds
-    rounds_data = []
-    for r in rounds:
-        res: dict[str, Any] = dict()
-        res['id'] = r.id
-        res['is_complete'] = r.is_complete()
-        res['is_selected'] = r.id == selected_id
-        rounds_data.append(res)
+    rounds_data = get_tournament_rounds_data(selected_id)
     context = {
         "request": request,
         "rounds": rounds_data,
@@ -98,6 +102,7 @@ async def round_input(
         "matchups": matchups,
         "round_id": round_id,
         "is_complete": is_complete,
+        "rounds": get_tournament_rounds_data(round_id)
     }
     return templates.TemplateResponse("round_form.html", context)
 
@@ -137,6 +142,7 @@ async def round_update(
             "id": round.id,
             "is_selected": True,
         },
+        "rounds": get_tournament_rounds_data(round_id)
     }
     return templates.TemplateResponse("tab_round.html", context)
 
@@ -187,6 +193,7 @@ async def standings_get(
         "request": request,
         "standings": res,
         "columns": columns,
+        "rounds": get_tournament_rounds_data()
     }
     return templates.TemplateResponse("standings.html", context)
 

@@ -1,3 +1,7 @@
+{% with rounds=rounds %}
+  {% include "tab_all.html" %}
+{% endwith %}
+
 <div>
   <form class="bg-gray-100" hx-post="/round_update/{{round_id}}" hx-target="#tab-round-{{round_id}}" hx-swap="outerHTML">
     <p class="text-lg text-center">Fill in round results for round: {{round_id}}</p>
@@ -50,15 +54,19 @@
     id="round-status"
     >{{'in progress' if not is_complete else  'finished'}}
   </p>
-  <button
-    id="generate-round"
-    class="invisible"
-    hx-get="/generate_round/{{round_id + 1}}"
-    hx-trigger="click"
-    hx-swap="outerHTML"
-  >
-    Generate Next Round
-  </button>
+  {% if rounds|length == (round_id) %}
+    {% if is_complete%}
+  TODO: FIX THIS WIPING EVERYTHING. NEEDS TO RETURN ROUND FORM WITH TABS
+      <button
+        id="generate-round"
+        hx-get="/generate_round/{{round_id + 1}}"
+        hx-trigger="click"
+        hx-swap="outerHTML"
+      >
+        Generate Next Round
+      </button>
+    {% endif %}
+  {% endif %}
 </div>
 
 <script>
