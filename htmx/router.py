@@ -36,6 +36,28 @@ async def index(
     }
     return templates.TemplateResponse("index.html", context)
 
+@router.get("/load_all_tabs/{selected_id}")
+async def load_all_tabs(
+        selected_id: int,
+        *,
+        session: Session = Depends(get_session),
+        request: Request,
+    ):
+    # TODO: Add selector for tournaments
+    rounds: list[Round] = config.tournament.rounds
+    rounds_data = []
+    for r in rounds:
+        res: dict[str, Any] = dict()
+        res['id'] = r.id
+        res['is_complete'] = r.is_complete()
+        res['is_selected'] = r.id == selected_id
+        rounds_data.append(res)
+    context = {
+        "request": request,
+        "rounds": rounds_data,
+    }
+    return templates.TemplateResponse("tab_all.html", context)
+
 @router.get("/round_input/{round_id}")
 async def round_input(
         round_id: int,
@@ -110,9 +132,10 @@ async def round_update(
 
     context = {
         "request": request,
-        "status": "finished" if is_complete else "in progress"
+        "status": "finished" if is_complete else "in progress",
+        "round_id": round.id,
     }
-    return templates.TemplateResponse("round_status.html", context)
+    return templates.TemplateResponse("tab_round.html", context)
 
 
 @router.get("/generate_round/{round_id}")
@@ -135,9 +158,9 @@ async def standings_get(
     res: list = []
     t: Tournament = config.tournament
     t.calculate_tie_break_results_swiss()
+    t.calculate_tie_break_results_round_robin()
     s = t.get_standings()
     full_names = {p.identifier: p.get_full_name() for p in t.players}
-    tie_breaks = t.tie_break_results_swiss
     for id, score in s.items():
         name = full_names[id]
         info: dict[str, Any] = {'name': name}
@@ -147,14 +170,20 @@ async def standings_get(
         info['identifier'] = id
         info['score'] = score
         info['tie_breaks'] = dict()
-        if tie_breaks:
-            for tb, trs in tie_breaks.items():
+        if (t.tie_break_results_swiss and t.tie_break_results_round_robin):
+            for tb, trs in t.tie_break_results_round_robin.items():
+                info['tie_breaks'][tb.name] = trs[id]
+            for tb, trs in t.tie_break_results_swiss.items():
                 info['tie_breaks'][tb.name] = trs[id]
         res.append(info)
+    columns: list[str] = ['#', 'Player', 'Score'] + \
+        [k.name.replace('_', ' ').capitalize() for k in t.tie_break_results_round_robin.keys()] + \
+        [k.name.replace('_', ' ').capitalize() for k in t.tie_break_results_swiss.keys()]
 
     context = {
         "request": request,
         "standings": res,
+        "columns": columns,
     }
     return templates.TemplateResponse("standings.html", context)
 

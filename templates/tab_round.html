@@ -1,0 +1,10 @@
+<button
+  class="{{'bg-blue-600' if round.is_complete else 'bg-gray-500'}}"
+  id="tab-round-{{round.id}}"
+  role="tab"
+  aria-controls="tab-content"
+  aria-selected="true"
+  hx-get="/round_input/{{round.id}}"
+  class="{{'selected' if is_selected else ''}}">
+    R{{round.id}}
+</button>

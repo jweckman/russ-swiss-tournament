@@ -1,5 +1,5 @@
 <div>
-  <form class="bg-gray-100" hx-post="/round_update/{{round_id}}" hx-target="#round-status" hx-swap="innerHTML">
+  <form class="bg-gray-100" hx-post="/round_update/{{round_id}}" hx-target="#tab-round-{{round_id}}" hx-swap="outerHTML">
     <p class="text-lg text-center">Fill in round results for round: {{round_id}}</p>
     <div class="p-3 w-9/12 m-auto">
     {% for m in matchups %}
@@ -37,7 +37,7 @@
     {% endfor %}
     <input
       class=""
-      _="on click if #round-status.innerHTML matches 'finished' then remove .invisible from #generate-round"
+        _="on click if #round-status.innerHTML matches 'finished' then remove .invisible from #generate-round"
         log #round-status.innerHTML"
       type="submit"
       value="Submit"
@@ -46,6 +46,7 @@
   </form>
   <p
     _="on change if me.innerHTML matches 'finished' then remove .invisible from #generate-round"
+    class="hidden"
     id="round-status"
     >{{'in progress' if not is_complete else  'finished'}}
   </p>

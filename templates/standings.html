@@ -1,21 +1,34 @@
 <p class="text-lg text-center">Standings</p>
-<div class="p-3">
-  {% for s in standings %}
-    <div class="flex gap-2">
-      <div class="basis-2/12">
-        <button hx-get="/player_rounds_modal/{{s.identifier}}" hx-target="body" hx-swap="beforeend">{{s.name}}</button>
-      </div>
-      <div class="flex"></div>
-      <div class="basis-20">
-        <p>{{s.score}}</p>
-      </div>
-      {% if s['tie_breaks'] %}
-        {% for tb_name, tb_value in s.tie_breaks.items() %}
-          <div class="basis-5">
-            <p>{{tb_value}}</p>
+<div class="text-center">
+  <table class="w-full">
+    <tr>
+      {% for col in columns %}
+        <th>{{col}}</th>
+      {% endfor %}
+    </tr>
+    {% for s in standings %}
+      <div class="flex gap-2">
+        <tr>
+        <td>{{loop.index}}</td>
+        <td>
+          <div class="remove-all"
+            <button
+              _="on mouseenter add .bg-gray-500 to me end
+                  on mouseleave remove .bg-gray-500 from me end"
+              hx-get="/player_rounds_modal/{{s.identifier}}"
+              hx-target="body"
+              hx-swap="beforeend">{{s.name}}
+            </button>
           </div>
-        {% endfor %}
-      {% endif %}
-    </div>
-  {% endfor %}
+        </td>
+        <td>{{s.score}}</td>
+        {% if s['tie_breaks'] %}
+          {% for tb_name, tb_value in s.tie_breaks.items() %}
+            <td>{{tb_value}}</td>
+          {% endfor %}
+        {% endif %}
+        </tr>
+      </div>
+    {% endfor %}
+  </table>
 </div>

@@ -1,0 +1,25 @@
+<div
+  id="tabs-rounds"
+  hx-target="#tab-contents"
+  role="tablist"
+  _="on htmx:afterOnLoad set @aria-selected of <[aria-selected=true]/> to false tell the target take .selected set @aria-selected to true"
+>
+  {% for round in rounds %}
+      <button
+        class="{{'bg-blue-600' if round.is_complete else 'bg-gray-500'}}"
+        id="tab-round-{{round.id}}"
+        role="tab"
+        aria-controls="tab-content"
+        aria-selected="true"
+        hx-get="/round_input/{{round.id}}"
+        class="{{'selected' if is_selected else ''}}">R{{round.id}}</button>
+  {% endfor %}
+</div>
+<div
+  hx-target="#tab-contents"
+  role="tablist"
+  _="on htmx:afterOnLoad set @aria-selected of <[aria-selected=true]/> to false tell the target take .selected set @aria-selected to true"
+>
+  <button role="tab" aria-controls="tab-content" aria-selected="false" hx-get="/standings">Standings</button>
+  <div id="content">{% block content %}{% endblock %}</div>
+</div>
