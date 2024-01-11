@@ -132,8 +132,11 @@ async def round_update(
 
     context = {
         "request": request,
-        "status": "finished" if is_complete else "in progress",
-        "round_id": round.id,
+        "round": {
+            "is_complete": is_complete,
+            "id": round.id,
+            "is_selected": True,
+        },
     }
     return templates.TemplateResponse("tab_round.html", context)
 
