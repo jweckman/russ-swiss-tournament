@@ -15,7 +15,7 @@ from russ_swiss_tournament import tie_break
 from russ_swiss_tournament.service import MatchResult, Color, pairwise, split_list
 
 from htmx.db import get_session
-from htmx.models import TournamentModel, RoundModel, PlayerModel, MatchupModel
+from htmx.models import TournamentModel, RoundModel, PlayerModel, MatchupModel, PlayerTournamentStartOrder
 
 class RoundSystem(Enum):
     SWISS = 1
@@ -45,13 +45,14 @@ class Tournament:
             create_players: bool = False,
             folder: Path | None = None,
             round_folder: Path | None = None,
+            player_tournament_start_order: list = [],
         ):
         if id == -1:
             self.id = next(self.id_iter)
         else:
             self.id = id
         self.name = name
-        self.players = players
+        self.players = self._order_players(players, player_tournament_start_order)
         self.rounds = rounds
         self.round_count = round_count
         self.round_system = round_system
@@ -79,6 +80,15 @@ class Tournament:
                     "not respecting this ordering and should be fixed."
                 )
         self._rounds = value
+
+    def _order_players(self, players: list, order: list[int]):
+        if order:
+            try:
+                players = sorted(players, key = lambda p: order.index(p.identifier))
+            except ValueError:
+                raise ValueError("Trying to order players but some ids do not exist in ordering.")
+            pass
+        return players
 
     @classmethod
     def db_write(
@@ -128,6 +138,14 @@ class Tournament:
             is_ids = True
         ids = [t.id for t in selves] if not is_ids else selves
         tournament_model = [t for t in session.exec(select(TournamentModel).where(col(TournamentModel.id).in_(ids)))][0]
+        players = Player.from_db(tournament_model.players)[0]
+        player_ids = [p.identifier for p in players]
+        start_order_db = session.exec(
+            select(PlayerTournamentStartOrder).where(
+                PlayerTournamentStartOrder.tournament_id == tournament_model.id,
+                col(PlayerTournamentStartOrder.player_id).in_(player_ids),
+            ).order_by(col(PlayerTournamentStartOrder.start_order).desc())
+        ).all()
         tournament = Tournament(
             id = tournament_model.id,
             name = tournament_model.name,
@@ -139,6 +157,7 @@ class Tournament:
             tie_break_results_round_robin = dict(),
             year = tournament_model.year,
             count = 30,  # TODO hard coded,
+            player_tournament_start_order = [r.player_id for r in start_order_db]
         )
         return tournament
 
@@ -180,10 +199,11 @@ class Tournament:
 
         rounds = []
         player_ids = toml_conf['players']['ids']
+        start_order = player_ids.copy()
         if create_players:
             players = cls.create_players(player_ids)
         elif db:
-            players = Player.from_db(player_ids)[1]
+            players = Player.from_db(player_ids)[0]
         elif players_manual:
             players = players_manual
         if read_rounds:
@@ -218,7 +238,8 @@ class Tournament:
             year = toml_conf['general']['year'],
             count = toml_conf['general']['count'],
             folder = Path().cwd() / 'tournaments' / toml_conf['general']['folder'],
-            round_folder = round_path
+            round_folder = round_path,
+            player_tournament_start_order = start_order,
         )
 
     def calculate_tie_break_results_swiss(self):

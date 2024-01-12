@@ -49,3 +49,10 @@ class MatchupModel(SQLModel, table=True):
 
     round_id: Optional[int] = Field(default=None, foreign_key="roundmodel.id")
     rounds: Optional[RoundModel] = Relationship(back_populates='matchups')
+
+class PlayerTournamentStartOrder(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    start_order: int
+
+    tournament_id: Optional[int] = Field(default=None, foreign_key="tournamentmodel.id")
+    player_id: Optional[int] = Field(default=None, foreign_key="playermodel.id")

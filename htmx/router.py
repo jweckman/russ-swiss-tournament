@@ -101,7 +101,6 @@ def get_round_input_context(
         "is_complete": is_complete,
         "rounds": get_tournament_rounds_data(round_id)
     }
-    print(f"rounds len: {len(config.tournament.rounds)}, round_count: {config.tournament.round_count}")
     context['is_last_round'] = len(config.tournament.rounds) == config.tournament.round_count
     return context
 

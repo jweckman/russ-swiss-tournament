@@ -49,7 +49,7 @@ def generate_round_robin_rounds():
 def generate_first_swiss_round():
     Player.read_players_from_csv()
     t = Tournament.from_toml(
-        Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
+        Path.cwd() / 'tournaments' / 'russ_30' / 'config.toml',
         read_rounds = False,
         db = 'htmx',
     )
@@ -65,7 +65,7 @@ def initialize_from_db():
 
 # config.tournament = generate_round_robin_rounds()
 
-# config.tournament = generate_first_swiss_round()
+config.tournament = generate_first_swiss_round()
 
 config.tournament = initialize_from_db()
 config.assigner = SwissAssigner(config.tournament)
