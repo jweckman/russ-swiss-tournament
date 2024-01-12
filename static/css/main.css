@@ -567,10 +567,6 @@ button:hover,
   background-color: rgb(55 65 81 / var(--tw-bg-opacity));
 }
 
-.visible {
-  visibility: visible;
-}
-
 .invisible {
   visibility: hidden;
 }
@@ -579,16 +575,8 @@ button:hover,
   position: static;
 }
 
-.m-40 {
-  margin: 10rem;
-}
-
 .m-auto {
   margin: auto;
-}
-
-.ml-40 {
-  margin-left: 10rem;
 }
 
 .ml-20 {
@@ -615,24 +603,12 @@ button:hover,
   display: none;
 }
 
-.w-6\/12 {
-  width: 50%;
+.w-6 {
+  width: 1.5rem;
 }
 
 .w-9\/12 {
   width: 75%;
-}
-
-.w-3 {
-  width: 0.75rem;
-}
-
-.w-32 {
-  width: 8rem;
-}
-
-.w-6 {
-  width: 1.5rem;
 }
 
 .w-full {
@@ -647,38 +623,13 @@ button:hover,
   flex-basis: 16.666667%;
 }
 
-.basis-2\/12 {
-  flex-basis: 16.666667%;
-}
-
-.basis-20 {
-  flex-basis: 5rem;
-}
-
-.basis-5 {
-  flex-basis: 1.25rem;
-}
-
-.basis-1\/12 {
-  flex-basis: 8.333333%;
-}
-
-.appearance-none {
-  -webkit-appearance: none;
-     -moz-appearance: none;
-          appearance: none;
-}
-
-.place-content-center {
-  place-content: center;
-}
-
-.justify-center {
-  justify-content: center;
-}
-
 .gap-2 {
   gap: 0.5rem;
+}
+
+.bg-blue-600 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(37 99 235 / var(--tw-bg-opacity));
 }
 
 .bg-gray-100 {
@@ -689,11 +640,6 @@ button:hover,
 .bg-gray-500 {
   --tw-bg-opacity: 1;
   background-color: rgb(107 114 128 / var(--tw-bg-opacity));
-}
-
-.bg-blue-600 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(37 99 235 / var(--tw-bg-opacity));
 }
 
 .p-3 {

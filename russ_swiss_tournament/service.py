@@ -22,6 +22,7 @@ match_result_manual_map = {
     "wo": MatchResult.WALKOVER,
     "walkover": MatchResult.WALKOVER,
     None: MatchResult.UNSET,
+    'None': MatchResult.UNSET,
     "": MatchResult.UNSET,
     False: MatchResult.UNSET,
     "unset": MatchResult.UNSET,

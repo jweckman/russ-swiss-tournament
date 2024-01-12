@@ -3,7 +3,7 @@
 {% endwith %}
 
 <div>
-  <form class="bg-gray-100" hx-post="/round_update/{{round_id}}" hx-target="#tab-round-{{round_id}}" hx-swap="outerHTML">
+  <form class="bg-gray-100" hx-post="/round_update/{{round_id}}" hx-target="#tabs" hx-swap="innerHTML">
     <p class="text-lg text-center">Fill in round results for round: {{round_id}}</p>
     <div class="p-3 w-9/12 m-auto">
     {% for m in matchups %}
@@ -55,13 +55,13 @@
     >{{'in progress' if not is_complete else  'finished'}}
   </p>
   {% if rounds|length == (round_id) %}
-    {% if is_complete%}
-  TODO: FIX THIS WIPING EVERYTHING. NEEDS TO RETURN ROUND FORM WITH TABS
+    {% if is_complete and not is_last_round%}
       <button
         id="generate-round"
         hx-get="/generate_round/{{round_id + 1}}"
         hx-trigger="click"
-        hx-swap="outerHTML"
+        hx-swap="innerHTML"
+        hx-target="#tabs"
       >
         Generate Next Round
       </button>

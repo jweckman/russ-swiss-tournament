@@ -62,14 +62,11 @@ async def load_all_tabs(
     }
     return templates.TemplateResponse("tab_all.html", context)
 
-@router.get("/round_input/{round_id}")
-async def round_input(
+def get_round_input_context(
         round_id: int,
-        *,
-        session: Session = Depends(get_session),
         request: Request,
-    ):
-    # TODO: Add selector for tournaments
+        session: Session,
+    ) -> dict:
     tournament_model_id = 1
     round_model_query = select(RoundModel).where(
         RoundModel.tournament_id == tournament_model_id,
@@ -104,12 +101,26 @@ async def round_input(
         "is_complete": is_complete,
         "rounds": get_tournament_rounds_data(round_id)
     }
+    print(f"rounds len: {len(config.tournament.rounds)}, round_count: {config.tournament.round_count}")
+    context['is_last_round'] = len(config.tournament.rounds) == config.tournament.round_count
+    return context
+
+@router.get("/round_input/{round_id}")
+async def round_input(
+        round_id: int,
+        *,
+        session: Session = Depends(get_session),
+        request: Request,
+    ):
+    # TODO: Add selector for tournaments
+    context = get_round_input_context(round_id, session=session, request=request)
     return templates.TemplateResponse("round_form.html", context)
 
 @router.post("/round_update/{round_id}")
 async def round_update(
         round_id: int,
         request: Request,
+        session: Session = Depends(get_session),
     ):
     round = config.tournament.get_round_by_index(round_id)
     form_data = await request.form()
@@ -128,6 +139,9 @@ async def round_update(
     Matchup.db_write(matchups, update=True)
 
     config.tournament.validate_no_incomplete_match_results_in_rounds()
+    context = get_round_input_context(round_id, request=request, session=session)
+
+    return templates.TemplateResponse("round_form.html", context)
 
     # TODO: repetition, make prettier
     if round:
@@ -158,6 +172,9 @@ async def round_generate(
         raise ValueError("Can only generate new round with SwissAssigner mapped to config")
     new_round: Round = config.assigner.create_next_round()
     Round.db_write([new_round])
+
+    context = get_round_input_context(round_id, request=request, session=session)
+    return templates.TemplateResponse("round_form.html", context)
 
 @router.get("/standings")
 async def standings_get(
