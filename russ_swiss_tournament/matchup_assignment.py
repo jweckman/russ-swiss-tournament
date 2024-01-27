@@ -17,6 +17,7 @@ class SwissAssigner:
         self.players_standing_sort: list | None = None
         self.matchup_colors: list[tuple[int,int]] = []
         self.already_paired: set = set()
+        self.top_players: list[int] = list(tournament.get_standings().keys())[:2] if tournament.get_standings() else []
 
     def _assign_matchup_colors(self, higher: int, lower: int) -> tuple[int,int]:
         player_color_counts = self.tournament.get_player_color_counts()
@@ -65,7 +66,7 @@ class SwissAssigner:
         print(f"Matched players: w: {white} b: {black}")
         print(f"Remaining players: {self.players_standing_sort}")
 
-    def _assign_round_colors(self) -> list[tuple[int,int]]:
+    def _assign_round_colors(self, brute_force_count: int = 10):
         '''
         Returns list of player ids white, black.
 
@@ -92,7 +93,7 @@ class SwissAssigner:
             raise ValueError(
                 "Uneven number of participants is currently not supported"
             )
-        for z in range(10):
+        for z in range(brute_force_count):
             self.matchup_colors = []
             self.already_paired = set()
 
@@ -100,9 +101,12 @@ class SwissAssigner:
             self.players_standing_sort = list(reversed(
                 {k: v for k, v in sorted(self.tournament.get_standings().items(), key=lambda item: item[1])}.keys()
             ))
+            print(f"players_standing_sort: {self.players_standing_sort}")
             if z != 0:
-                # TODO: inform user of using brute force to generate
-                shuffle(self.players_standing_sort)
+                print(f"----------BRUTE FORCING ASSIGNMENT: TRY COUNT = {z + 1}--------------")
+                non_top_players = [x for x in self.players_standing_sort if x not in self.top_players]
+                shuffle(non_top_players)
+                self.players_standing_sort = self.top_players + non_top_players
 
             def _find_matchup_pairs_by_standing():
                 if len(self.players_standing_sort) == 0:
@@ -114,6 +118,8 @@ class SwissAssigner:
                 print(f"Already paired: {self.already_paired}")
                 pool = self.players_standing_sort[1:].copy()
                 for i, p in enumerate(pool):
+                    if len(self.players_standing_sort) == 0:
+                        return True
                     forbidden = (
                         self.already_paired
                         | higher_opponents
@@ -126,7 +132,7 @@ class SwissAssigner:
                         _find_matchup_pairs_by_standing()
                         break
                     print(f"Pool is {pool}")
-                    if p in forbidden and i == len(pool) - 1 :
+                    if p in forbidden and i == len(pool) - 1:
                         print(f"matchup_colors index: {i}/{len(pool) - 1}")
                         print(f"matchup_colors len before swap: {len(self.matchup_colors)}")
                         successful_swap = self._swap_player(higher, p)
@@ -136,7 +142,7 @@ class SwissAssigner:
                         else:
                             return False
             success = _find_matchup_pairs_by_standing()
-            if success:
+            if success or len(self.players_standing_sort) == 0:
                 break
 
     def _swap_player(self, higher: int, p: int):
@@ -168,6 +174,7 @@ class SwissAssigner:
                 if  (
                         swap_candidate not in self.opponents[higher]
                         and p not in self.opponents[candidate_current_opponent]
+                        and not any([tp in [p, swap_candidate, higher] for tp in self.top_players])
                     ):
                     actual_index = -1 * (j + 1)
                     assert {swap_candidate, candidate_current_opponent} == set(self.matchup_colors[actual_index])
