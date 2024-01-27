@@ -74,8 +74,19 @@ def get_round_input_context(
     )
     round_model_res = session.exec(round_model_query).first()
     matchups: list = []
+    standings = config.tournament.get_standings(until=round_id - 1)
+    player_ranks: None | list[int] = None
+    if standings:
+        player_ranks = list(standings.keys())
     for matchup_data in round_model_res.matchups:
         matchup = dict()
+        if player_ranks:
+            top_ranked_index = min([
+                player_ranks.index(matchup_data.white_identifier),
+                player_ranks.index(matchup_data.black_identifier),
+            ])
+            matchup['top_ranked_index'] = top_ranked_index
+
         white_full_name = [p for p in config.tournament.players if p.identifier == matchup_data.white_identifier]
         if white_full_name and len(white_full_name) == 1:
             matchup['white_full_name'] = white_full_name[0].get_full_name()
@@ -87,6 +98,8 @@ def get_round_input_context(
         matchup['white_identifier'] = matchup_data.white_identifier
         matchup['black_identifier'] = matchup_data.black_identifier
         matchups.append(matchup)
+    if round_id != 1 and player_ranks:
+        matchups = sorted(matchups, key = lambda m: m['top_ranked_index'])
 
     round = config.tournament.get_round_by_index(round_id)
     if round:

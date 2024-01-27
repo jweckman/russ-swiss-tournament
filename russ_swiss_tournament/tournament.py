@@ -336,18 +336,30 @@ class Tournament:
         Ascending sort of result dictionary.
         Round index is 1 based
         '''
+        last_complete_index = self.get_last_complete_round_index()
+        if not last_complete_index:
+            return None
         if until == 'latest':
             index = len(self.rounds)
         elif until == 'latest_complete':
-            index = self.get_last_complete_round_index()
+            index = last_complete_index
             if not index:
                 raise ValueError(
                     "No completed rounds yet, standings could not be calculated"
                 )
+        elif isinstance(until, int):
+            if until > last_complete_index:
+                index = None
+            else:
+                index = until
         else:
-            index = until
+            raise ValueError(
+                f"Invalid argument for until: {until}. Could not get standings."
+            )
         res = None
         used_rounds = self.rounds[:index]
+        if not used_rounds:
+            return None
         # TODO fix recursion error with tie break inside get_standings()
         # self.calculate_tie_break_results_round_robin()
         # self.calculate_tie_break_results_swiss()
@@ -356,7 +368,7 @@ class Tournament:
             if i == 0:
                 res = r.get_results()
             else:
-                res = dict(Counter(res)+Counter(r.get_results()))
+                res = dict(Counter(res) + Counter(r.get_results()))
         res = {k: v for k, v in sorted(res.items(), key=lambda item: item[1], reverse=True)}
         for p in self.players:
             if p.identifier not in res:

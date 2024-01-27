@@ -65,7 +65,7 @@ def initialize_from_db():
 
 # config.tournament = generate_round_robin_rounds()
 
-config.tournament = generate_first_swiss_round()
+# config.tournament = generate_first_swiss_round()
 
 config.tournament = initialize_from_db()
 config.assigner = SwissAssigner(config.tournament)
