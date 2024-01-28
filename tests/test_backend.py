@@ -69,7 +69,7 @@ def test_should_create_valid_round():
     m3 = Matchup({Color.W: PlayerMatch(players[4],MatchResult.WIN),Color.B: PlayerMatch(players[5],MatchResult.LOSS)})
     m4 = Matchup({Color.W: PlayerMatch(players[6],MatchResult.LOSS),Color.B: PlayerMatch(players[7],MatchResult.WIN)})
     m5 = Matchup({Color.W: PlayerMatch(players[8],MatchResult.DRAW),Color.B: PlayerMatch(players[9],MatchResult.DRAW)})
-    matchups = [m1,m2,m3,m4,m5]
+    matchups = [m1, m2, m3, m4, m5]
     r = Round(matchups)
     assert r.index == 1
     r = Round(matchups, 2)
@@ -96,7 +96,10 @@ def create_random_round(matchup_count):
     second = 2
     for i in range(matchup_count):
         mr = choices(matchup_results, [20, 15, 50, 15])[0]
-        round_matchups.append(Matchup({Color.W: PlayerMatch(first, mr[0]),Color.B: PlayerMatch(second, mr[1])}))
+        round_matchups.append(Matchup({
+            Color.W: PlayerMatch(first, mr[0]),
+            Color.B: PlayerMatch(second, mr[1])
+        }))
         first += 2
         second += 2
     return Round(round_matchups)
@@ -115,8 +118,8 @@ def create_rounds(t, m, count, round_matchups=None):
             m.create_next_round()
             fill_round_with_random_values(t.rounds[-1])
     else:
-        for i,m in enumerate(round_matchups):
-            rounds.append(Round(i+1, m))
+        for i, m in enumerate(round_matchups):
+            rounds.append(Round(i + 1, m))
 
     return rounds
 
@@ -151,15 +154,20 @@ def test_should_calculate_sonne_koya_correctly():
     assert koya[9] == 1.5
 
 
-# def test_should_generate_swiss_rounds_correctly():
-#     for i in range(100):
-#         t = Tournament.from_toml(
-#             Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
-#             create_players = True,
-#             read_rounds = False,
-#         )
-#         sa = SwissAssigner(t)
-#         create_rounds(t, sa, t.round_count)
+def test_should_generate_swiss_rounds_correctly():
+    '''
+    Brute force test that creates a large number of random swiss
+    tournaments to see if there is a failure. As the round count approaches
+    player count, generating gets increasingly difficult and may fail.
+    '''
+    for i in range(100):
+        t = Tournament.from_toml(
+            Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
+            create_players = True,
+            read_rounds = False,
+        )
+        sa = SwissAssigner(t)
+        create_rounds(t, sa, t.round_count)
 
 def test_should_calculate_modified_median_solkoff_correctly():
     players = [
