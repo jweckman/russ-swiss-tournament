@@ -1,6 +1,8 @@
 import itertools
 import csv
 from typing import Self
+from io import StringIO
+from pathlib import Path
 
 from sqlmodel import select, col
 
@@ -75,22 +77,27 @@ class Round:
         new_records: list[RoundModel] = []
         for r_obj in selves:
             if r_obj.index in existing_db_ids:
-                if update:
-                    pass  # TODO
-            else:
-                new_record = RoundModel(
-                    index = r_obj.index,
-                    matchups = Matchup.db_write(r_obj.matchups),
-                    tournament_id = 1,  # TODO: hard coded
-                )
-                session.add(new_record)
-                session.flush()
-                session.refresh(new_record)
-                if new_record.id is None:
-                    raise ValueError("Trying to create a matchup without an id")
-                r_obj.id = new_record.id
-                session.commit()
-                new_records.append(new_record)
+                if update and len(existing_db) == 1:
+                    db_round = existing_db[0]
+                    [session.delete(m) for m in db_round.matchups]
+                    session.delete(db_round)
+                    session.commit()
+                else:
+                    # TODO: implement multi-delete
+                    return []
+            new_record = RoundModel(
+                index = r_obj.index,
+                matchups = Matchup.db_write(r_obj.matchups),
+                tournament_id = 1,  # TODO: hard coded
+            )
+            session.add(new_record)
+            session.flush()
+            session.refresh(new_record)
+            if new_record.id is None:
+                raise ValueError("Trying to create a matchup without an id")
+            r_obj.id = new_record.id
+            session.commit()
+            new_records.append(new_record)
         return new_records
 
     @classmethod
@@ -136,12 +143,17 @@ class Round:
     @classmethod
     def read_csv(
             cls,
-            path,
+            path: str | Path | StringIO,
             index,
             players: list[Player] | None = None
         ):
         matchups = []
-        with open(path, newline='') as csv_file:
+        if isinstance(path, str) or isinstance(path, Path):
+            csv_file = open(path, newline='')
+        elif isinstance(path, StringIO):
+            csv_file = path
+        # with open(path, newline='') as csv_file:
+        try:
             round_reader = csv.reader(csv_file, delimiter=',', quotechar='"')
             headers = next(round_reader, None)
             for line in round_reader:
@@ -159,6 +171,9 @@ class Round:
                     Color.B: PlayerMatch(black_player, match_result_manual_map[line[3]])
                 })
                 matchups.append(matchup)
+        finally:
+            if isinstance(csv_file, str) or isinstance(csv_file, Path):
+                csv_file.close()
         return cls(matchups, index)
 
     def get_results(self) -> dict[int,float]:

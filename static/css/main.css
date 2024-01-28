@@ -579,6 +579,18 @@ button:hover,
   margin: auto;
 }
 
+.m-44 {
+  margin: 11rem;
+}
+
+.m-56 {
+  margin: 14rem;
+}
+
+.m-72 {
+  margin: 18rem;
+}
+
 .ml-20 {
   margin-left: 5rem;
 }

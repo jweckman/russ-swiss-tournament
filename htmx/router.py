@@ -1,7 +1,9 @@
 from typing import Annotated, Any
 from datetime import datetime, timedelta, date
+import csv
+from io import StringIO
 
-from fastapi import FastAPI, Depends, Request, Query, Form, APIRouter
+from fastapi import FastAPI, Depends, Request, Query, Form, APIRouter, File
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -46,6 +48,21 @@ async def index(
         "request": request,
     }
     return templates.TemplateResponse("index.html", context)
+
+@router.post("/upload_round_csv/{round_id}")
+async def upload_round_csv(
+        round_id: int,
+        *,
+        file: Annotated[bytes, File()],
+        session: Session = Depends(get_session),
+        request: Request,
+    ):
+    content = file.decode()
+    file_text = StringIO(content)
+    round = Round.read_csv(file_text, round_id, config.tournament.players)
+    Round.db_write([round])
+    context = get_round_input_context(round_id, session=session, request=request)
+    return templates.TemplateResponse("round_form.html", context)
 
 @router.get("/load_all_tabs/{selected_id}")
 async def load_all_tabs(

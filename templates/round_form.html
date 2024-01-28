@@ -67,6 +67,29 @@
       </button>
     {% endif %}
   {% endif %}
+
+  <div class="m-72"></div>
+  <form
+    class=""
+    hx-post="/upload_round_csv/{{round_id}}"
+    hx-target="#tabs"
+    hx-swap="innerHTML"
+    hx-encoding="multipart/form-data"
+  >
+    <label for="file">FORCE OVERWRITE FROM CSV</label>
+    <input
+      id="read-round-from-csv"
+      name="file"
+      type="file"
+      accept=".csv"
+      required
+    >
+    <input
+      class=""
+      type="submit"
+      value="Submit"
+    >
+  </form>
 </div>
 
 <script>
