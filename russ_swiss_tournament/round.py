@@ -76,28 +76,31 @@ class Round:
 
         new_records: list[RoundModel] = []
         for r_obj in selves:
+            db_round = None
             if r_obj.index in existing_db_ids:
                 if update and len(existing_db) == 1:
                     db_round = existing_db[0]
                     [session.delete(m) for m in db_round.matchups]
-                    session.delete(db_round)
                     session.commit()
                 else:
                     # TODO: implement multi-delete
                     return []
-            new_record = RoundModel(
-                index = r_obj.index,
-                matchups = Matchup.db_write(r_obj.matchups),
-                tournament_id = 1,  # TODO: hard coded
-            )
-            session.add(new_record)
-            session.flush()
-            session.refresh(new_record)
-            if new_record.id is None:
-                raise ValueError("Trying to create a matchup without an id")
-            r_obj.id = new_record.id
-            session.commit()
-            new_records.append(new_record)
+            if db_round:
+                Matchup.db_write(r_obj.matchups, round_id = db_round.id)
+            else:
+                new_record = RoundModel(
+                    index = r_obj.index,
+                    matchups = Matchup.db_write(r_obj.matchups),
+                    tournament_id = 1,  # TODO: hard coded
+                )
+                session.add(new_record)
+                session.flush()
+                session.refresh(new_record)
+                if new_record.id is None:
+                    raise ValueError("Trying to create a matchup without an id")
+                r_obj.id = new_record.id
+                session.commit()
+                new_records.append(new_record)
         return new_records
 
     @classmethod

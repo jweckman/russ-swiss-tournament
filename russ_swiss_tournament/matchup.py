@@ -70,6 +70,7 @@ class Matchup:
             self,
             selves: list[Self],
             update: bool = False,
+            round_id: int | None = None,
         ) -> list[MatchupModel]:
         '''Writes/updates selves to db'''
         session = next(get_session())
@@ -101,6 +102,8 @@ class Matchup:
                     white_score = t_obj.res[Color.W].res.value,
                     black_score = t_obj.res[Color.B].res.value,
                 )
+                if round_id:
+                    new_record.round_id = round_id
                 session.add(new_record)
                 session.flush()
                 session.refresh(new_record)
