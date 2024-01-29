@@ -55,4 +55,4 @@ class PlayerTournamentStartOrder(SQLModel, table=True):
     start_order: int
 
     tournament_id: Optional[int] = Field(default=None, foreign_key="tournamentmodel.id")
-    player_id: Optional[int] = Field(default=None, foreign_key="playermodel.id")
+    player_identifier: Optional[int] = Field(default=None, foreign_key="playermodel.identifier")

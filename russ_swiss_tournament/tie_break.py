@@ -90,8 +90,9 @@ def calc_modified_median_solkoff(rounds: list[Round], player_ids: set, opponents
                 mod_med_scores.pop(mod_med_scores.index(max(mod_med_scores)))
         else:
             mod_med_scores.pop(mod_med_scores.index(max(mod_med_scores)))
-            mod_med_scores.pop(mod_med_scores.index(min(mod_med_scores)))
-            if nine_or_more_rounds:
+            if len(rounds) > 1:
+                mod_med_scores.pop(mod_med_scores.index(min(mod_med_scores)))
+            if nine_or_more_rounds and len(rounds) > 2:
                 mod_med_scores.pop(mod_med_scores.index(max(mod_med_scores)))
                 mod_med_scores.pop(mod_med_scores.index(min(mod_med_scores)))
 

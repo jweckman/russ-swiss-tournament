@@ -62,6 +62,7 @@ class Tournament:
         self.count = count
         self.folder = folder
         self.round_folder = round_folder
+        self.player_tournament_start_order = player_tournament_start_order
 
     def __repr__(self):
         return pprint.pformat([[m.res for m in r.matchups] for r in self.rounds], indent=4)
@@ -119,6 +120,14 @@ class Tournament:
                 session.add(new_record)
                 session.flush()
                 session.refresh(new_record)
+                for i, p in enumerate(t_obj.players):
+                    start_order = PlayerTournamentStartOrder(
+                        start_order = i + 1,
+                        tournament_id = new_record.id,
+                        player_identifier = p.identifier,
+                    )
+                    session.add(start_order)
+                session.flush()
                 if new_record.id is None:
                     raise ValueError("Trying to create a tournament without an id")
                 t_obj.id = new_record.id
@@ -143,9 +152,11 @@ class Tournament:
         start_order_db = session.exec(
             select(PlayerTournamentStartOrder).where(
                 PlayerTournamentStartOrder.tournament_id == tournament_model.id,
-                col(PlayerTournamentStartOrder.player_id).in_(player_ids),
+                col(PlayerTournamentStartOrder.player_identifier).in_(player_ids),
             ).order_by(col(PlayerTournamentStartOrder.start_order).desc())
         ).all()
+        start_order_ordered = sorted(start_order_db, key = lambda x: x.start_order)
+        start_order_ordered_identifiers = [r.player_identifier for r in start_order_ordered]
         tournament = Tournament(
             id = tournament_model.id,
             name = tournament_model.name,
@@ -157,7 +168,7 @@ class Tournament:
             tie_break_results_round_robin = dict(),
             year = tournament_model.year,
             count = 30,  # TODO hard coded,
-            player_tournament_start_order = [r.player_id for r in start_order_db]
+            player_tournament_start_order = start_order_ordered_identifiers,
         )
         return tournament
 
@@ -369,10 +380,29 @@ class Tournament:
                 res = r.get_results()
             else:
                 res = dict(Counter(res) + Counter(r.get_results()))
-        res = {k: v for k, v in sorted(res.items(), key=lambda item: item[1], reverse=True)}
+        if self.tie_break_results_round_robin:
+            res = {
+                k: v for k, v in sorted(res.items(), key=lambda item: (
+                        round(
+                            item[1],
+                            2,
+                        ),
+                        round(
+                            self.tie_break_results_round_robin[tie_break.TieBreakMethodRoundRobin.SONNEBORN_BERGER][item[0]],
+                            2,
+                        ),
+                        -self.player_tournament_start_order.index(item[0]),
+                    ),
+                    reverse=True
+                )
+            }
+        else:
+            res = {k: v for k, v in sorted(res.items(), key=lambda item: item[1], reverse=True)}
+
         for p in self.players:
             if p.identifier not in res:
                 res[p.identifier] = 0
+        print(f"------RES FROM STANDINGS:\n{[p for p in res]}")
         return res
 
     def validate_no_incomplete_match_results_in_rounds(self):

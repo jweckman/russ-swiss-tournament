@@ -98,10 +98,7 @@ class SwissAssigner:
             self.already_paired = set()
 
             self.opponents = self.tournament.get_opponents()
-            self.players_standing_sort = list(reversed(
-                {k: v for k, v in sorted(self.tournament.get_standings().items(), key=lambda item: item[1])}.keys()
-            ))
-            print(f"players_standing_sort: {self.players_standing_sort}")
+            self.players_standing_sort = [p for p in self.tournament.get_standings()]
             if z != 0:
                 print(f"----------BRUTE FORCING ASSIGNMENT: TRY COUNT = {z + 1}--------------")
                 non_top_players = [x for x in self.players_standing_sort if x not in self.top_players]
@@ -193,9 +190,6 @@ class SwissAssigner:
         if not self.tournament.rounds:
             new_round = self.tournament._create_initial_round()
         else:
-            self.players_standing_sort = list(reversed(
-                {k: v for k, v in sorted(self.tournament.get_standings().items(), key=lambda item: item[1])}.keys()
-            ))
             self.tournament.validate_no_incomplete_match_results_in_rounds()
             self._assign_round_colors()
             matchups = []
@@ -220,6 +214,7 @@ class SwissAssigner:
             # Make sure there are no unevenly assigned matchups
             assert all([len(v) == len(self.tournament.rounds) for v in self.tournament.get_opponents().values()])
             self.tournament.validate_no_duplicate_matchups()
+
         return new_round
 
 class RoundRobinAssigner:
