@@ -253,23 +253,25 @@ class Tournament:
             player_tournament_start_order = start_order,
         )
 
-    def calculate_tie_break_results_swiss(self):
+    def get_tie_break_results_swiss(self, until: str | int = 'latest') -> tuple[dict, dict]:
+        if until == 'latest':
+            last_round_index = self.get_last_complete_round_index()
+        else:
+            last_round_index = int(until)
         mm, solk = tie_break.calc_modified_median_solkoff(
-            self.rounds[:self.get_last_complete_round_index()],
+            self.rounds[:last_round_index],
             [p.identifier for p in self.players],
             self.get_opponents()
         )
-        self.tie_break_results_swiss[tie_break.TieBreakMethodSwiss.MODIFIED_MEDIAN] = mm
-        self.tie_break_results_swiss[tie_break.TieBreakMethodSwiss.SOLKOFF] = solk
+        return mm, solk
 
-    def calculate_tie_break_results_round_robin(self):
+    def get_tie_break_results_round_robin(self, until: str | int = 'latest') -> tuple[dict, dict]:
         sonne, koya = tie_break.calc_sonne_koya(
-            *self.get_player_defeated_drawn(),
-            self.get_standings(),
+            *self.get_player_defeated_drawn(until=until),
+            self.get_standings(until=until),
             len(self.rounds),
         )
-        self.tie_break_results_round_robin[tie_break.TieBreakMethodRoundRobin.SONNEBORN_BERGER] = sonne
-        self.tie_break_results_round_robin[tie_break.TieBreakMethodRoundRobin.KOYA] = koya
+        return sonne, koya
 
     def get_opponents(
             self,
@@ -297,7 +299,10 @@ class Tournament:
 
         return results
 
-    def get_player_defeated_drawn(self) -> (dict[int,list[list,list]], dict[int,dict[int,float]]):
+    def get_player_defeated_drawn(
+            self,
+            until: str | int = 'latest_complete'
+        ) -> (dict[int,list[list,list]], dict[int,dict[int,float]]):
         '''
         Returns 
         1.  dict with player id as key and list of lists with
@@ -307,7 +312,7 @@ class Tournament:
         player_ids = [p.identifier for p in self.players]
         pdd = dict(zip(list(player_ids), [[[],[]] for i in range(len(player_ids))]))
         pdd_scores = dict(zip(list(player_ids), [dict() for i in range(len(player_ids))]))
-        for r in self.rounds[:self.get_last_complete_round_index()]:
+        for r in self.rounds[:self._until_to_index(until)]:
             for m in r.matchups:
                 score_white = match_result_score_map[m.res[Color.W].res]
                 score_black = match_result_score_map[m.res[Color.B].res]
@@ -323,8 +328,7 @@ class Tournament:
                 pdd_scores[m.res[Color.B].player.identifier][m.res[Color.W].player.identifier] = score_black
         return pdd, pdd_scores
 
-
-    def get_player_color_counts(self, until: str | int ='latest') -> dict[int,list[int]]:
+    def get_player_color_counts(self, until: str | int = 'latest') -> dict[int, list[int]]:
         player_ids = [p.identifier for p in self.players]
         if until == 'latest':
             index = len(self.rounds)
@@ -338,15 +342,7 @@ class Tournament:
                 results[m.res[Color.B].player.identifier][1] += 1
         return results
 
-    def get_standings(
-            self,
-            until: str | int = 'latest_complete'
-        ) -> dict[int,float] | None:
-        '''
-        Get entire tournament standings until chosen round. Defaults to latest complete results.
-        Ascending sort of result dictionary.
-        Round index is 1 based
-        '''
+    def _until_to_index(self, until: str | int) -> int | None:
         last_complete_index = self.get_last_complete_round_index()
         if not last_complete_index:
             return None
@@ -367,28 +363,65 @@ class Tournament:
             raise ValueError(
                 f"Invalid argument for until: {until}. Could not get standings."
             )
-        res = None
+        return index
+
+    def get_standings(
+            self,
+            until: str | int = 'latest_complete'
+        ) -> dict[int, float] | None:
+        '''
+        Get entire tournament standings until chosen round. Defaults to latest complete results.
+        Round index is 1 based
+        Sorting is done separately!
+        '''
+        index = self._until_to_index(until)
         used_rounds = self.rounds[:index]
         if not used_rounds:
             return None
-        # TODO fix recursion error with tie break inside get_standings()
-        # self.calculate_tie_break_results_round_robin()
-        # self.calculate_tie_break_results_swiss()
-        # TODO sort by standings and tie break
+        unsorted_standings: dict[int, float] = dict()
         for i, r in enumerate(used_rounds):
             if i == 0:
-                res = r.get_results()
+                unsorted_standings = r.get_results()
             else:
-                res = dict(Counter(res) + Counter(r.get_results()))
-        if self.tie_break_results_round_robin:
+                current_unsorted = Counter(unsorted_standings)
+                next_results = Counter(r.get_results())
+                # Don't include partial rounds
+                if any([v is None for v in next_results.values()]):
+                    break
+                unsorted_standings = dict(current_unsorted + next_results)
+        for p in self.players:
+            if p.identifier not in unsorted_standings:
+                unsorted_standings[p.identifier] = 0
+        return unsorted_standings
+
+    def sort_standings(
+            self,
+            standings: dict[int, float],
+            until: str | int = 'latest_complete'
+        ) -> dict[int, float] | None:
+        # TODO: do not use hard-coded sonneborn-berger as sorting tie-break, should be dynamic
+        if (
+                not standings
+                or (isinstance(standings, dict) and any([v is None for v in standings.values()]))
+            ):
+            return None
+        index = self._until_to_index(until)
+        if index:
+            sonne = self.get_tie_break_results_round_robin(until=index)[0]
+        else:
+            sonne = None
+        if not sonne:
+            res = {k: v for k, v in sorted(standings.items(), key=lambda item: item[1], reverse=True)}
+        else:
             res = {
-                k: v for k, v in sorted(res.items(), key=lambda item: (
+                k: v for k, v in sorted(
+                    standings.items(), key=lambda item: (
                         round(
                             item[1],
                             2,
                         ),
                         round(
-                            self.tie_break_results_round_robin[tie_break.TieBreakMethodRoundRobin.SONNEBORN_BERGER][item[0]],
+                            sonne[item[0]],
                             2,
                         ),
                         -self.player_tournament_start_order.index(item[0]),
@@ -396,14 +429,16 @@ class Tournament:
                     reverse=True
                 )
             }
-        else:
-            res = {k: v for k, v in sorted(res.items(), key=lambda item: item[1], reverse=True)}
-
-        for p in self.players:
-            if p.identifier not in res:
-                res[p.identifier] = 0
-        print(f"------RES FROM STANDINGS:\n{[p for p in res]}")
         return res
+
+    def get_sorted_standings(
+            self,
+            until: str | int = 'latest_complete'
+        ) -> dict[int, float] | None:
+        standings = self.get_standings(until)
+        if standings:
+            standings = self.sort_standings(standings, until)
+        return standings
 
     def validate_no_incomplete_match_results_in_rounds(self):
         for round in self.rounds:

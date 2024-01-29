@@ -17,7 +17,7 @@ class SwissAssigner:
         self.players_standing_sort: list | None = None
         self.matchup_colors: list[tuple[int,int]] = []
         self.already_paired: set = set()
-        self.top_players: list[int] = list(tournament.get_standings().keys())[:2] if tournament.get_standings() else []
+        self.top_players: list[int] = list(tournament.get_sorted_standings().keys())[:2] if tournament.get_sorted_standings() else []
 
     def _assign_matchup_colors(self, higher: int, lower: int) -> tuple[int,int]:
         player_color_counts = self.tournament.get_player_color_counts()
@@ -98,7 +98,7 @@ class SwissAssigner:
             self.already_paired = set()
 
             self.opponents = self.tournament.get_opponents()
-            self.players_standing_sort = [p for p in self.tournament.get_standings()]
+            self.players_standing_sort = [p for p in self.tournament.get_sorted_standings()]
             if z != 0:
                 print(f"----------BRUTE FORCING ASSIGNMENT: TRY COUNT = {z + 1}--------------")
                 non_top_players = [x for x in self.players_standing_sort if x not in self.top_players]

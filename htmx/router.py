@@ -91,7 +91,7 @@ def get_round_input_context(
     )
     round_model_res = session.exec(round_model_query).first()
     matchups: list = []
-    standings = config.tournament.get_standings(until=round_id - 1)
+    standings = config.tournament.get_sorted_standings(until=round_id - 1)
     player_ranks: None | list[int] = None
     if standings:
         player_ranks = list(standings.keys())
@@ -212,10 +212,12 @@ async def standings_get(
     ):
     res: list = []
     t: Tournament = config.tournament
-    t.calculate_tie_break_results_swiss()
-    t.calculate_tie_break_results_round_robin()
-    s = t.get_standings()
+    s = t.get_sorted_standings()
+    if not s:
+        raise ValueError("Could not get standings. Probably no complete rounds yet")
     full_names = {p.identifier: p.get_full_name() for p in t.players}
+    sonne, koya = config.tournament.get_tie_break_results_round_robin()
+    modified_median, solkoff = config.tournament.get_tie_break_results_swiss()
     for id, score in s.items():
         name = full_names[id]
         info: dict[str, Any] = {'name': name}
@@ -225,15 +227,12 @@ async def standings_get(
         info['identifier'] = id
         info['score'] = score
         info['tie_breaks'] = dict()
-        if (t.tie_break_results_swiss and t.tie_break_results_round_robin):
-            for tb, trs in t.tie_break_results_round_robin.items():
-                info['tie_breaks'][tb.name] = trs[id]
-            for tb, trs in t.tie_break_results_swiss.items():
-                info['tie_breaks'][tb.name] = trs[id]
+        info['tie_breaks']['Sonneborn-Berger'] = sonne[id]
+        info['tie_breaks']['Koya'] = koya[id]
+        info['tie_breaks']['Modified Median'] = modified_median[id]
+        info['tie_breaks']['Solkoff'] = solkoff[id]
         res.append(info)
-    columns: list[str] = ['#', 'Player', 'Score'] + \
-        [k.name.replace('_', ' ').capitalize() for k in t.tie_break_results_round_robin.keys()] + \
-        [k.name.replace('_', ' ').capitalize() for k in t.tie_break_results_swiss.keys()]
+    columns: list[str] = ['#', 'Player', 'Score', 'Sonneborn-Berger', 'Koya', 'Modified Median', 'Solkoff']
 
     context = {
         "request": request,

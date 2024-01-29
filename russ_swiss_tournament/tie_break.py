@@ -40,7 +40,11 @@ def modified_median_solkoff_model_scores(rounds, player_ids):
 
     return pms
 
-def calc_modified_median_solkoff(rounds: list[Round], player_ids: set, opponents: dict):
+def calc_modified_median_solkoff(
+        rounds: list[Round],
+        player_ids: set,
+        opponents: dict
+    ) -> tuple[dict, dict]:
     '''
     First calculate model scores for each player.
 
@@ -106,7 +110,7 @@ def calc_sonne_koya(
         player_defeated_drawn_scores: dict[int,dict[int,float]],
         player_standings: dict[int,float],
         round_count,
-    ):
+    ) -> tuple[dict, dict]:
     '''
     Sonneborn-Berger: the sum of the scores of the opponents a player has
     defeated and half the scores of the players with whom he has drawn.
