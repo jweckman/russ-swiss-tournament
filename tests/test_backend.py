@@ -21,54 +21,54 @@ def test_should_get_player_name():
 # MATCHUP
 def test_should_create_without_result():
     p1, p2 = create_players(2)
-    m = Matchup({Color.W: PlayerMatch(p1),Color.B: PlayerMatch(p2)})
+    m = Matchup({Color.W: PlayerMatch(p1), Color.B: PlayerMatch(p2)})
     assert m.res[Color.W].res == MatchResult.UNSET
     assert m.res[Color.B].res == MatchResult.UNSET
 
 def test_should_add_result_valid():
     p1, p2 = create_players(2)
-    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
+    m = Matchup({Color.W: PlayerMatch(p1, MatchResult.UNSET), Color.B: PlayerMatch(p2, MatchResult.UNSET)})
     m.add_result(MatchResult.WIN, MatchResult.LOSS)
     assert m.res[Color.B].res == MatchResult.LOSS
 
 def test_should_add_result_invalid():
     p1, p2 = create_players(2)
-    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
+    m = Matchup({Color.W: PlayerMatch(p1, MatchResult.UNSET), Color.B: PlayerMatch(p2, MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.WIN, MatchResult.WIN)
 
 def test_should_not_add_result_invalid_single_draw():
     p1, p2 = create_players(2)
-    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
+    m = Matchup({Color.W: PlayerMatch(p1, MatchResult.UNSET), Color.B: PlayerMatch(p2, MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.DRAW, MatchResult.LOSS)
 
 def test_should_not_add_result_invalid_multi_win():
     p1, p2 = create_players(2)
-    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
+    m = Matchup({Color.W: PlayerMatch(p1, MatchResult.UNSET), Color.B: PlayerMatch(p2, MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.WIN, MatchResult.WIN)
 
 def test_should_not_add_result_invalid_multi_loss():
     p1, p2 = create_players(2)
-    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
+    m = Matchup({Color.W: PlayerMatch(p1, MatchResult.UNSET), Color.B: PlayerMatch(p2, MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.LOSS, MatchResult.LOSS)
 
 def test_should_not_add_result_invalid_single_unset():
     p1, p2 = create_players(2)
-    m = Matchup({Color.W: PlayerMatch(p1,MatchResult.UNSET),Color.B: PlayerMatch(p2,MatchResult.UNSET)})
+    m = Matchup({Color.W: PlayerMatch(p1, MatchResult.UNSET), Color.B: PlayerMatch(p2, MatchResult.UNSET)})
     with pytest.raises(ValueError):
         m.add_result(MatchResult.LOSS, MatchResult.UNSET)
 
 # ROUND
 def test_should_create_valid_round():
     players = create_players(10)
-    m1 = Matchup({Color.W: PlayerMatch(players[0],MatchResult.WIN),Color.B: PlayerMatch(players[1],MatchResult.LOSS)})
-    m2 = Matchup({Color.W: PlayerMatch(players[2],MatchResult.LOSS),Color.B: PlayerMatch(players[3],MatchResult.WIN)})
-    m3 = Matchup({Color.W: PlayerMatch(players[4],MatchResult.WIN),Color.B: PlayerMatch(players[5],MatchResult.LOSS)})
-    m4 = Matchup({Color.W: PlayerMatch(players[6],MatchResult.LOSS),Color.B: PlayerMatch(players[7],MatchResult.WIN)})
-    m5 = Matchup({Color.W: PlayerMatch(players[8],MatchResult.DRAW),Color.B: PlayerMatch(players[9],MatchResult.DRAW)})
+    m1 = Matchup({Color.W: PlayerMatch(players[0], MatchResult.WIN), Color.B: PlayerMatch(players[1], MatchResult.LOSS)})
+    m2 = Matchup({Color.W: PlayerMatch(players[2], MatchResult.LOSS), Color.B: PlayerMatch(players[3], MatchResult.WIN)})
+    m3 = Matchup({Color.W: PlayerMatch(players[4], MatchResult.WIN), Color.B: PlayerMatch(players[5], MatchResult.LOSS)})
+    m4 = Matchup({Color.W: PlayerMatch(players[6], MatchResult.LOSS), Color.B: PlayerMatch(players[7], MatchResult.WIN)})
+    m5 = Matchup({Color.W: PlayerMatch(players[8], MatchResult.DRAW), Color.B: PlayerMatch(players[9], MatchResult.DRAW)})
     matchups = [m1, m2, m3, m4, m5]
     r = Round(matchups)
     assert r.index == 1

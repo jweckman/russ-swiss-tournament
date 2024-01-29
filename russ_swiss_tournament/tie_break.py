@@ -106,9 +106,9 @@ def calc_modified_median_solkoff(
     return modified_median, solkoff
 
 def calc_sonne_koya(
-        player_defeated_drawn: dict[int,list[list,list]],
-        player_defeated_drawn_scores: dict[int,dict[int,float]],
-        player_standings: dict[int,float],
+        player_defeated_drawn: dict[int, list[list]],
+        player_defeated_drawn_scores: dict[int, dict[int, float]],
+        player_standings: dict[int, float],
         round_count,
     ) -> tuple[dict, dict]:
     '''
@@ -118,15 +118,15 @@ def calc_sonne_koya(
     '''
     tournament_max_score = round_count
     tournament_half_score = tournament_max_score / 2
-    sonne = dict(zip(list(player_standings.keys()), [0 for i in range(len(player_standings.keys()))]))
-    koya = dict(zip(list(player_standings.keys()), [0 for i in range(len(player_standings.keys()))]))
+    sonne: dict[int, float] = dict(zip(list(player_standings.keys()), [0 for i in range(len(player_standings.keys()))]))
+    koya: dict[int, float] = dict(zip(list(player_standings.keys()), [0 for i in range(len(player_standings.keys()))]))
 
     for p, dd in player_defeated_drawn.items():
         sonne[p] += sum([player_standings[x] or 0 for x in dd[0]])
         sonne[p] += sum([player_standings[x] * 0.5 or 0 for x in dd[1]])
 
     for p, dd in player_defeated_drawn.items():
-        good_opp_scores = 0
+        good_opp_scores: float = 0
         for def_drawn_player in dd[0] + dd[1]:
             is_good_opp = player_standings[def_drawn_player] >= tournament_half_score
             if is_good_opp:

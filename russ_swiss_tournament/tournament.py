@@ -21,6 +21,7 @@ class RoundSystem(Enum):
     SWISS = 1
     BERGER = 2
 
+
 round_system_tie_break_map = {
     RoundSystem.SWISS: tie_break.TieBreakMethodSwiss,
     RoundSystem.BERGER: tie_break.TieBreakMethodRoundRobin,
@@ -192,7 +193,7 @@ class Tournament:
 
         rounds = []
         for i, f in enumerate(csv_files):
-            rounds.append(Round.read_csv(f, i+1, players))
+            rounds.append(Round.read_csv(f, i + 1, players))
         return rounds
 
     @classmethod
@@ -275,9 +276,9 @@ class Tournament:
 
     def get_opponents(
             self,
-            until: str | int ='latest',
+            until: str | int = 'latest',
             inverse: bool = False,
-        ) -> dict[int,list[int]]:
+        ) -> dict[int, list[int]]:
         '''
         Possible to get unplayed by setting inverse boolean to True.
         '''
@@ -302,15 +303,15 @@ class Tournament:
     def get_player_defeated_drawn(
             self,
             until: str | int = 'latest_complete'
-        ) -> (dict[int,list[list,list]], dict[int,dict[int,float]]):
+        ) -> (dict[int, list[list, list]], dict[int, dict[int, float]]):
         '''
-        Returns 
+        Returns
         1.  dict with player id as key and list of lists with
             defeated players ids in the first one and drawn in the second.
         2.  dict with player id as key and dict containins match results by opponent.
         '''
         player_ids = [p.identifier for p in self.players]
-        pdd = dict(zip(list(player_ids), [[[],[]] for i in range(len(player_ids))]))
+        pdd = dict(zip(list(player_ids), [[[], []] for i in range(len(player_ids))]))
         pdd_scores = dict(zip(list(player_ids), [dict() for i in range(len(player_ids))]))
         for r in self.rounds[:self._until_to_index(until)]:
             for m in r.matchups:
@@ -334,7 +335,7 @@ class Tournament:
             index = len(self.rounds)
         else:
             index = until
-        results = dict(zip(list(player_ids), [[0,0] for i in range(len(player_ids))]))
+        results = dict(zip(list(player_ids), [[0, 0] for i in range(len(player_ids))]))
         # TODO: handle walkover not counting
         for r in self.rounds[:index]:
             for m in r.matchups:
@@ -486,11 +487,14 @@ class Tournament:
 
     def _create_initial_round(self):
         # Players list should already be orderd by rank
-        middle_index=len(self.players)//2
+        middle_index = len(self.players) // 2
         first, second = split_list(self.players.copy(), middle_index)
         matchups = []
         for i, p in enumerate(first):
-            matchups.append(Matchup({Color.W: PlayerMatch(second[i]),Color.B: PlayerMatch(p)}))
+            matchups.append(Matchup({
+                Color.W: PlayerMatch(second[i]),
+                Color.B: PlayerMatch(p)}
+            ))
         new_round = Round(matchups, index = 1)
         self.rounds.append(new_round)
         return new_round

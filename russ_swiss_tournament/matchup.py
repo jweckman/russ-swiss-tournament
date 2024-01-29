@@ -6,7 +6,7 @@ from typing import Self, Any
 from sqlmodel import select, col
 
 from russ_swiss_tournament.player import Player
-from russ_swiss_tournament.service import  MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
+from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
 
 from htmx.db import get_session
 from htmx.models import MatchupModel, RoundModel
@@ -19,6 +19,7 @@ class PlayerMatch:
 
 class Matchup:
     id_iter = itertools.count()
+
     def __init__(
             self,
             res: dict[Color, PlayerMatch],
@@ -164,7 +165,7 @@ class Matchup:
         self.res[Color.W].res = white_res
         self.res[Color.B].res = black_res
 
-    def get_winner_loser_colors(self) -> (tuple[Color,Color] | None, bool) :
+    def get_winner_loser_colors(self) -> (tuple[Color, Color] | None, bool):
         '''None means no winner. Winner first loser/walkover second in returned tuple'''
         winner_loser_colors = None
         is_walkover = {self.res[Color.W].res, self.res[Color.B].res} == {MatchResult.WIN, MatchResult.WALKOVER}

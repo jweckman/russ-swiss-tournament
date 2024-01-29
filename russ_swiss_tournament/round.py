@@ -49,6 +49,7 @@ match_result_score_text_map = {
 class Round:
     '''Note: index var starts from 1 to match with csv file names'''
     id_iter = itertools.count()
+
     def __init__(
             self,
             matchups: list[Matchup],
@@ -133,7 +134,11 @@ class Round:
         return objects, existing_db
 
     @classmethod
-    def match_player(cls, s:str, players: list[Player]) -> Player:
+    def match_player(
+            cls,
+            s: str,
+            players: list[Player]
+        ) -> Player:
         res = None
         sanitized = s.lower().strip()
         for p in players:

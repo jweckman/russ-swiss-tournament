@@ -11,6 +11,7 @@ class Color(Enum):
     W = 1
     B = 2
 
+
 match_result_manual_map = {
     1: MatchResult.WIN,
     '1': MatchResult.WIN,
@@ -29,7 +30,7 @@ match_result_manual_map = {
 }
 
 match_result_score_map = {
-    MatchResult.WIN:  1,
+    MatchResult.WIN: 1,
     MatchResult.LOSS: 0,
     MatchResult.DRAW: 0.5,
     MatchResult.UNSET: None,
@@ -37,7 +38,7 @@ match_result_score_map = {
 }
 
 match_result_score_text_map = {
-    MatchResult.WIN:  1,
+    MatchResult.WIN: 1,
     MatchResult.LOSS: 0,
     MatchResult.DRAW: '½',
     MatchResult.UNSET: '~',
@@ -49,10 +50,10 @@ def pairwise(iterable):
     a = iter(iterable)
     return zip(a, a)
 
-def split_list(input_list,n):
-    first_half=input_list[:n]
-    sec_half=input_list[n:]
-    return first_half,sec_half
+def split_list(input_list, n):
+    first_half = input_list[:n]
+    sec_half = input_list[n:]
+    return first_half, sec_half
 
 def matchup_to_dict(matchup, players):
     matchup = dict()

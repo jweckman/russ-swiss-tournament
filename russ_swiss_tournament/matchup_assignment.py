@@ -13,13 +13,13 @@ class SwissAssigner:
             tournament,
         ):
         self.tournament = tournament
-        self.opponents: dict[int,list[int]] = tournament.get_opponents()
+        self.opponents: dict[int, list[int]] = tournament.get_opponents()
         self.players_standing_sort: list | None = None
-        self.matchup_colors: list[tuple[int,int]] = []
+        self.matchup_colors: list[tuple[int, int]] = []
         self.already_paired: set = set()
         self.top_players: list[int] = list(tournament.get_sorted_standings().keys())[:2] if tournament.get_sorted_standings() else []
 
-    def _assign_matchup_colors(self, higher: int, lower: int) -> tuple[int,int]:
+    def _assign_matchup_colors(self, higher: int, lower: int) -> tuple[int, int]:
         player_color_counts = self.tournament.get_player_color_counts()
         h_colors = player_color_counts[higher]
         l_colors = player_color_counts[lower]
@@ -62,7 +62,7 @@ class SwissAssigner:
         self.already_paired.add(white)
         self.already_paired.add(black)
         if remove_candidates:
-            self._remove_from_candidates([higher,lower])
+            self._remove_from_candidates([higher, lower])
         print(f"Matched players: w: {white} b: {black}")
         print(f"Remaining players: {self.players_standing_sort}")
 
@@ -158,8 +158,8 @@ class SwissAssigner:
         blacks = [m[1] for m in self.matchup_colors]
         blacks_reversed = list(reversed(blacks))
 
-        {print(f"{k}: {v}") for k,v in self.opponents.items()}
-        {print(f"{k}: {v}") for k,v in self.tournament.get_opponents(inverse=True).items()}
+        {print(f"{k}: {v}") for k, v in self.opponents.items()}
+        {print(f"{k}: {v}") for k, v in self.tournament.get_opponents(inverse=True).items()}
         for i, players in enumerate([blacks_reversed, whites_reversed]):
             if i == 0:
                 other = whites_reversed
@@ -168,7 +168,7 @@ class SwissAssigner:
             for j, swap_candidate in enumerate(players):
                 print(f"-----SWAP CANDIDATE: {swap_candidate}-----")
                 candidate_current_opponent = other[j]
-                if  (
+                if (
                         swap_candidate not in self.opponents[higher]
                         and p not in self.opponents[candidate_current_opponent]
                         and not any([tp in [p, swap_candidate, higher] for tp in self.top_players])
@@ -177,7 +177,7 @@ class SwissAssigner:
                     assert {swap_candidate, candidate_current_opponent} == set(self.matchup_colors[actual_index])
                     to_modify = self.matchup_colors[actual_index]
                     print(f"replace this: {self.matchup_colors[actual_index]} with: {(candidate_current_opponent,p)} ")
-                    self.matchup_colors[actual_index] = (candidate_current_opponent,p)
+                    self.matchup_colors[actual_index] = (candidate_current_opponent, p)
                     self._assign_matchup_colors_to_res(higher, swap_candidate, remove_candidates=False)
                     self.players_standing_sort.pop(self.players_standing_sort.index(higher))
                     self.players_standing_sort.pop(self.players_standing_sort.index(p))
@@ -246,30 +246,29 @@ class RoundRobinAssigner:
         # Rd 8: 10-9, 1-8, 2-7, 3-6, 4-5.
         # Rd 9: 5-10, 6-4, 7-3, 8-2, 9-1.
 
-
     def generate_berger_round(self, r):
         matchups_tuples = []
         if r % 2 == 1:
             for i in range(self.half):
-                matchups_tuples.append((self.players[i],self.players[self.player_count-1-i]))
+                matchups_tuples.append((self.players[i], self.players[self.player_count - 1 - i]))
         else:
-            matchups_tuples.append((self.players[self.player_count-1],self.players[0]))
-            for i in range(1,self.half):
-                matchups_tuples.append((self.players[i],self.players[self.player_count-1-i]))
+            matchups_tuples.append((self.players[self.player_count - 1], self.players[0]))
+            for i in range(1, self.half):
+                matchups_tuples.append((self.players[i], self.players[self.player_count - 1 - i]))
         return matchups_tuples
 
     def create_berger_rounds(self):
         '''https://en.wikipedia.org/wiki/Round-robin_tournament#Berger_tables'''
 
         tuple_rounds = []
-        self.players=[x for x in range(1,self.player_count+1)]
+        self.players = [x for x in range(1, self.player_count + 1)]
         tuple_rounds.append(self.generate_berger_round(1))
-        for x in range(2,self.player_count):
-            j = self.players[self.player_count-1]
-            del self.players[self.player_count-1]
+        for x in range(2, self.player_count):
+            j = self.players[self.player_count - 1]
+            del self.players[self.player_count - 1]
             self.players.extend(x for x in self.players[0:self.half])
-            self.players[0:self.half-1] = self.players[self.half:self.player_count-1]
-            del self.players[self.half-1:self.player_count-1]
+            self.players[0:self.half - 1] = self.players[self.half:self.player_count - 1]
+            del self.players[self.half - 1:self.player_count - 1]
             self.players.append(j)
             tuple_rounds.append(self.generate_berger_round(x))
         self.berger_result = tuple_rounds
@@ -285,11 +284,10 @@ class RoundRobinAssigner:
         for round in self.berger_result:
             r = []
             for matchup in round:
-                r.append(
-                    (
-                        self.tournament.players[matchup[0] - 1].identifier,
-                        self.tournament.players[matchup[1] - 1].identifier)
-                )
+                r.append((
+                    self.tournament.players[matchup[0] - 1].identifier,
+                    self.tournament.players[matchup[1] - 1].identifier,
+                ))
             brpid.append(r)
         return brpid
 
@@ -310,5 +308,5 @@ class RoundRobinAssigner:
                         Color.B: [PlayerMatch(p) for p in self.tournament.players if p.identifier == matchup_player_ids[1]][0],
                     }
                 ))
-            self.tournament.rounds.append(Round(round_matchups, i+1))
+            self.tournament.rounds.append(Round(round_matchups, i + 1))
 
