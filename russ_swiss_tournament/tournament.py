@@ -329,19 +329,44 @@ class Tournament:
                 pdd_scores[m.res[Color.B].player.identifier][m.res[Color.W].player.identifier] = score_black
         return pdd, pdd_scores
 
-    def get_player_color_counts(self, until: str | int = 'latest') -> dict[int, list[int]]:
+    def get_player_colors(
+            self,
+            until: str | int = 'latest',
+            used_assigner = None  # Can be used for debugging purposes
+        ) -> (dict[int, list[int]], set, set):
+        '''
+        Encode white as 1 and black as -1.
+        This way we can easily calculate preferred color.
+        '''
         player_ids = [p.identifier for p in self.players]
         if until == 'latest':
             index = len(self.rounds)
         else:
             index = until
-        results = dict(zip(list(player_ids), [[0, 0] for i in range(len(player_ids))]))
+        colors: dict[int, list] = {p: [] for p in player_ids}
+        veto_black: set = set()
+        veto_white: set = set()
         # TODO: handle walkover not counting
         for r in self.rounds[:index]:
             for m in r.matchups:
-                results[m.res[Color.W].player.identifier][0] += 1
-                results[m.res[Color.B].player.identifier][1] += 1
-        return results
+                white_id, black_id = m.get_player_ids()
+                colors[white_id].append(1)
+                colors[black_id].append(-1)
+        if index > 2:
+            for player_id, player_colors in colors.items():
+                if index > 3 and abs(sum(player_colors[-4:])) == 4:
+                    raise ValueError(
+                        "A player has played four consecutive rounds with the same color. "
+                        "This must not happen, review the code and make sure this is corrected "
+                        "in the next round."
+                    )
+                last_three = sum(player_colors[-3:])
+                if last_three == 3:
+                    veto_white.add(player_id)
+                elif last_three == -3:
+                    veto_black.add(player_id)
+
+        return colors, veto_white, veto_black
 
     def _until_to_index(self, until: str | int) -> int | None:
         last_complete_index = self.get_last_complete_round_index()

@@ -110,11 +110,12 @@ def fill_round_with_random_values(round: Round):
         round.matchups[i].res[Color.W].res = random_round.matchups[i].res[Color.W].res
         round.matchups[i].res[Color.B].res = random_round.matchups[i].res[Color.B].res
 
-def create_rounds(t, m, count, round_matchups=None):
+def create_rounds(t, count, round_matchups=None):
     rounds = []
     if not round_matchups:
         for r_id in range(count):
             print(f"-------------- Round: {r_id + 1}-----------------")
+            m = SwissAssigner(t)
             m.create_next_round()
             fill_round_with_random_values(t.rounds[-1])
     else:
@@ -154,20 +155,37 @@ def test_should_calculate_sonne_koya_correctly():
     assert koya[9] == 1.5
 
 
-def test_should_generate_swiss_rounds_correctly():
+def test_should_generate_swiss_rounds_correctly(count_mode=True):
     '''
     Brute force test that creates a large number of random swiss
     tournaments to see if there is a failure. As the round count approaches
     player count, generating gets increasingly difficult and may fail.
+
+    The main reason for failures are color related, i.e a player gets assigned
+    the same color four times. Getting the color_fail_count down to 0 means that
+    everything works all the time. With 20 players failure rate seems to be at
+    around 7%, which is very good. More debugging is needed to find those cases that
+    cause these failures. Using 12 players (worst case) the percentage drops lower when
+    all 100 runs pass but the majority of the time there is a mysterious assertion error
+    that should be looked into.
     '''
+    color_fail_count = 0
     for i in range(100):
         t = Tournament.from_toml(
             Path.cwd() / 'tournaments' / 'test_swiss' / 'config.toml',
             create_players = True,
             read_rounds = False,
         )
-        sa = SwissAssigner(t)
-        create_rounds(t, sa, t.round_count)
+        try:
+            create_rounds(t, t.round_count)
+        except ValueError as e:
+            if count_mode:
+                if 'color' in str(e):
+                    color_fail_count += 1
+                    continue
+            else:
+                raise e
+    assert color_fail_count == 0
 
 def test_should_calculate_modified_median_solkoff_correctly():
     players = [
@@ -189,9 +207,7 @@ def test_should_calculate_modified_median_solkoff_correctly():
     t.rounds = t.read_rounds(t.round_folder, t.players)
     # sa = SwissAssigner(t)
     # create_rounds(t, sa, t.round_count)
-    t.calculate_tie_break_results_swiss()
-    tbm = t.tie_break_results_swiss[TieBreakMethodSwiss.MODIFIED_MEDIAN]
-    tbs = t.tie_break_results_swiss[TieBreakMethodSwiss.SOLKOFF]
+    tbm, tbs = t.get_tie_break_results_swiss()
     assert tbm[0] == 3.5
     assert tbs[0] == 4
     assert tbm[1] == 3.5

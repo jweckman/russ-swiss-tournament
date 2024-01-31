@@ -197,6 +197,7 @@ async def round_generate(
         session: Session = Depends(get_session),
     ):
     prev_round: Round = config.tournament.get_round_by_index(round_id - 1)
+    config.assigner = SwissAssigner(config.tournament)
     if not isinstance(config.assigner, SwissAssigner):
         raise ValueError("Can only generate new round with SwissAssigner mapped to config")
     new_round: Round = config.assigner.create_next_round()

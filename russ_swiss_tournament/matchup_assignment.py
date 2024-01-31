@@ -7,39 +7,82 @@ from russ_swiss_tournament.service import MatchResult, Color
 from russ_swiss_tournament.player import Player
 
 class SwissAssigner:
-    '''Matchup colors is main result we want to generate. Following round is generated based on it'''
+    '''
+    Matchup colors is main result we want to generate. Following round is generated based on it
+
+    Note that all the state here is temporary! Never re-use this class for generating multiple rounds!
+    '''
     def __init__(
             self,
             tournament,
         ):
+        colors, veto_white, veto_black = tournament.get_player_colors()
         self.tournament = tournament
         self.opponents: dict[int, list[int]] = tournament.get_opponents()
         self.players_standing_sort: list | None = None
         self.matchup_colors: list[tuple[int, int]] = []
         self.already_paired: set = set()
         self.top_players: list[int] = list(tournament.get_sorted_standings().keys())[:2] if tournament.get_sorted_standings() else []
+        self.colors = colors
+        self.veto_white = veto_white
+        self.veto_black = veto_black
+        self.last_assigned_pair_info = dict()  # Enable and use for debugging
 
     def _assign_matchup_colors(self, higher: int, lower: int) -> tuple[int, int]:
-        player_color_counts = self.tournament.get_player_color_counts()
-        h_colors = player_color_counts[higher]
-        l_colors = player_color_counts[lower]
-        white_diff = h_colors[0] - l_colors[0]
-        black_diff = h_colors[1] - l_colors[1]
-        if white_diff != 0:
-            if white_diff > 0:
-                white = lower
-                black = higher
-            elif white_diff < 0:
-                black = lower
-                white = higher
-        elif black_diff != 0:
-            if black_diff > 0:
-                black = higher
-                white = lower
-            elif black_diff < 0:
-                black = lower
-                white = higher
-        else:
+        if self._players_in_same_veto_group(higher, lower, self.veto_white, self.veto_black):
+            raise ValueError(
+                "A player is about to be assigned four consecutive rounds with the same color. "
+                "This must not happen, review the code and make sure this is corrected "
+                "in the next round."
+            )
+        colors, veto_white, veto_black = self.tournament.get_player_colors(used_assigner=self)
+
+        # TODO: use these to prefer alternating color
+        h_colors = colors[higher]
+        l_colors = colors[lower]
+        h_sum = sum(h_colors)
+        l_sum = sum(l_colors)
+
+        # Positive means higher has more rounds as white pieces
+        total_diff = h_sum - l_sum
+        h_counts = (colors[higher].count(1), colors[higher].count(-1))
+        l_counts = (colors[lower].count(1), colors[lower].count(-1))
+        white_diff = h_counts[0] - l_counts[0]
+        black_diff = h_counts[1] - l_counts[1]
+        player_ids = [higher, lower]
+
+        # Use this for debugging
+        # self.last_assigned_pair_info = {
+        #     higher: {
+        #         'colors': h_colors,
+        #     },
+        #     lower: {
+        #         'colors': l_colors,
+        #     },
+        #     'veto_white': veto_white,
+        #     'veto_black': veto_black,
+        # }
+        # if abs(sum(h_colors[-3:])) == 3 or abs(sum(l_colors[-3:])) == 3:
+        #     print("-----PAIR INFO-----")
+        #     print(self.last_assigned_pair_info)
+
+        if abs(sum(h_colors[-3:])) == 3 and abs(sum(l_colors[-3:])) == 3:
+            if h_colors[-3:] == l_colors[-3:]:
+                raise ValueError(
+                    "Two players that both have played three times with the same color are about to be paired. "
+                    "This must not happen, review the code and make sure this is corrected "
+                    "in the next round."
+                )
+
+        for p in player_ids:
+            if p in veto_white:
+                other = [x for x in player_ids if x != p][0]
+                return other, p
+            if p in veto_black:
+                other = [x for x in player_ids if x != p][0]
+                return p, other
+
+        if white_diff == 0 and black_diff == 0:
             player_ids_by_rank = [p.identifier for p in self.tournament.players]
             higher_rank_index = player_ids_by_rank.index(higher)
             lower_rank_index = player_ids_by_rank.index(lower)
@@ -49,6 +92,13 @@ class SwissAssigner:
             else:
                 white = higher
                 black = lower
+        else:
+            if total_diff > 0:
+                white = lower
+                black = higher
+            elif total_diff < 0:
+                black = lower
+                white = higher
 
         return white, black
 
@@ -65,6 +115,20 @@ class SwissAssigner:
             self._remove_from_candidates([higher, lower])
         print(f"Matched players: w: {white} b: {black}")
         print(f"Remaining players: {self.players_standing_sort}")
+
+    def _players_in_same_veto_group(
+            self,
+            p1: int,
+            p2: int,
+            veto_white: set,
+            veto_black: set,
+        ) -> bool:
+        '''If players veto the same color they cannot be paired'''
+        player_set: set = set((p1, p2))
+        for veto_group in [veto_white, veto_black]:
+            if player_set.issubset(veto_group):
+                return True
+        return False
 
     def _assign_round_colors(self, brute_force_count: int = 10):
         '''
@@ -121,6 +185,11 @@ class SwissAssigner:
                         self.already_paired
                         | higher_opponents
                     )
+                    if self._players_in_same_veto_group(higher, p, self.veto_white, self.veto_black):
+                        forbidden |= set([p])
+
+                    if abs(sum(self.colors[higher][-3:])) == 3 and abs(sum(self.colors[p][-3:])) == 3:
+                        forbidden |= set([p])
                     if p not in forbidden:
                         self._assign_matchup_colors_to_res(
                             higher,
@@ -172,6 +241,7 @@ class SwissAssigner:
                         swap_candidate not in self.opponents[higher]
                         and p not in self.opponents[candidate_current_opponent]
                         and not any([tp in [p, swap_candidate, higher] for tp in self.top_players])
+                        and not abs(sum(self.colors[higher][-3:])) == 3 and abs(sum(self.colors[swap_candidate][-3:])) == 3
                     ):
                     actual_index = -1 * (j + 1)
                     assert {swap_candidate, candidate_current_opponent} == set(self.matchup_colors[actual_index])
