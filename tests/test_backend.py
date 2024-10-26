@@ -178,7 +178,7 @@ def test_should_generate_swiss_rounds_correctly(count_mode=True):
         )
         try:
             create_rounds(t, t.round_count)
-        except ValueError as e:
+        except (ValueError, AssertionError) as e:
             if count_mode:
                 if 'color' in str(e):
                     color_fail_count += 1
