@@ -11,6 +11,10 @@ class SwissAssigner:
     Matchup colors is main result we want to generate. Following round is generated based on it
 
     Note that all the state here is temporary! Never re-use this class for generating multiple rounds!
+
+    POSSIBLE READY-MADE REPLACEMENTS:
+    http://www.rrweb.org/javafo/JaVaFo.htm
+    https://www.vegachess.com/ns/download
     '''
 
     def __init__(
@@ -28,9 +32,12 @@ class SwissAssigner:
         self.veto_white = veto_white
         self.veto_black = veto_black
         self.last_assigned_pair_info = dict()  # Enable and use for debugging
+        self.relax_color_requirements: bool = False  # Intended to be enabled dynamically if solution can not be found
 
     def _assign_matchup_colors(self, higher: int, lower: int) -> tuple[int, int]:
-        if self._players_in_same_veto_group(higher, lower, self.veto_white, self.veto_black):
+        if (
+            self._players_in_same_veto_group(higher, lower, self.veto_white, self.veto_black)
+        ):
             raise ValueError(
                 "A player is about to be assigned four consecutive rounds with the same color. "
                 "This must not happen, review the code and make sure this is corrected "
@@ -67,8 +74,11 @@ class SwissAssigner:
         #     print("-----PAIR INFO-----")
         #     print(self.last_assigned_pair_info)
 
-        if abs(sum(h_colors[-3:])) == 3 and abs(sum(l_colors[-3:])) == 3:
-            if h_colors[-3:] == l_colors[-3:]:
+        if self._both_played_three_in_a_row_with_same_color(h_colors, l_colors):
+            if (
+                h_colors[-3:] == l_colors[-3:]
+                and not self.relax_color_requirements
+            ):
                 raise ValueError(
                     "Two players that both have played three times with the same color are about to be paired. "
                     "This must not happen, review the code and make sure this is corrected "
@@ -124,12 +134,25 @@ class SwissAssigner:
             veto_white: set,
             veto_black: set,
         ) -> bool:
-        '''If players veto the same color they cannot be paired'''
+        '''If players veto the same color they cannot be paired. Does nothing if colors are relaxed.'''
         player_set: set = set((p1, p2))
         for veto_group in [veto_white, veto_black]:
-            if player_set.issubset(veto_group):
+            if (
+                player_set.issubset(veto_group)
+                and not self.relax_color_requirements
+            ):
                 return True
         return False
+
+    def _both_played_three_in_a_row_with_same_color(
+        self,
+        colors_p1,
+        colors_p2,
+    ) -> bool:
+        return (
+            abs(sum(colors_p1[-3:])) == 3
+            and abs(sum(colors_p2[-3:])) == 3
+        )
 
     def _assign_round_colors(self, brute_force_count: int = 10):
         '''
@@ -164,7 +187,11 @@ class SwissAssigner:
 
             self.opponents = self.tournament.get_opponents()
             self.players_standing_sort = [p for p in self.tournament.get_sorted_standings()]
-            if z != 0:
+            if z == 1:
+                print("----------ATTEMPTING TO ASSIGN USING RELAXED COLOR REQUIREMENTS ONLY--------------")
+                self.relax_color_requirements = True
+            if z > 1:
+                # Note that colors have already been relaxed here.
                 print(f"----------BRUTE FORCING ASSIGNMENT: TRY COUNT = {z + 1}--------------")
                 non_top_players = [x for x in self.players_standing_sort if x not in self.top_players]
                 shuffle(non_top_players)
@@ -186,11 +213,12 @@ class SwissAssigner:
                         self.already_paired
                         | higher_opponents
                     )
-                    if self._players_in_same_veto_group(higher, p, self.veto_white, self.veto_black):
-                        forbidden |= set([p])
+                    if not self.relax_color_requirements:
+                        if self._players_in_same_veto_group(higher, p, self.veto_white, self.veto_black):
+                            forbidden |= set([p])
 
-                    if abs(sum(self.colors[higher][-3:])) == 3 and abs(sum(self.colors[p][-3:])) == 3:
-                        forbidden |= set([p])
+                        if self._both_played_three_in_a_row_with_same_color(self.colors[higher], self.colors[p]):
+                            forbidden |= set([p])
                     if p not in forbidden:
                         self._assign_matchup_colors_to_res(
                             higher,
@@ -242,7 +270,7 @@ class SwissAssigner:
                         swap_candidate not in self.opponents[higher]
                         and p not in self.opponents[candidate_current_opponent]
                         and not any([tp in [p, swap_candidate, higher] for tp in self.top_players])
-                        and not abs(sum(self.colors[higher][-3:])) == 3 and abs(sum(self.colors[swap_candidate][-3:])) == 3
+                        and not self._both_played_three_in_a_row_with_same_color(self.colors[higher], self.colors[swap_candidate])
                     ):
                     actual_index = -1 * (j + 1)
                     assert {swap_candidate, candidate_current_opponent} == set(self.matchup_colors[actual_index])

@@ -155,7 +155,7 @@ def test_should_calculate_sonne_koya_correctly():
     assert koya[9] == 1.5
 
 
-def test_should_generate_swiss_rounds_correctly(count_mode=True):
+def test_should_generatelswiss_rounds_correctly(count_mode=True):
     '''
     Brute force test that creates a large number of random swiss
     tournaments to see if there is a failure. As the round count approaches

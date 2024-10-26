@@ -355,11 +355,12 @@ class Tournament:
         if index > 2:
             for player_id, player_colors in colors.items():
                 if index > 3 and abs(sum(player_colors[-4:])) == 4:
-                    raise ValueError(
-                        "A player has played four consecutive rounds with the same color. "
-                        "This must not happen, review the code and make sure this is corrected "
-                        "in the next round."
-                    )
+                    # raise ValueError(
+                    #     "A player has played four consecutive rounds with the same color. "
+                    #     "This must not happen, review the code and make sure this is corrected "
+                    #     "in the next round."
+                    # )
+                    print(f"WARNING: Player {player_id} has played four consecutive rounds with the same color")
                 last_three = sum(player_colors[-3:])
                 if last_three == 3:
                     veto_white.add(player_id)
