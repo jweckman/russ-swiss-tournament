@@ -12,6 +12,7 @@ class SwissAssigner:
 
     Note that all the state here is temporary! Never re-use this class for generating multiple rounds!
     '''
+
     def __init__(
             self,
             tournament,
@@ -246,12 +247,12 @@ class SwissAssigner:
                     actual_index = -1 * (j + 1)
                     assert {swap_candidate, candidate_current_opponent} == set(self.matchup_colors[actual_index])
                     to_modify = self.matchup_colors[actual_index]
-                    print(f"replace this: {self.matchup_colors[actual_index]} with: {(candidate_current_opponent,p)} ")
+                    print(f"replace this: {self.matchup_colors[actual_index]} with: {(candidate_current_opponent, p)} ")
                     self.matchup_colors[actual_index] = (candidate_current_opponent, p)
                     self._assign_matchup_colors_to_res(higher, swap_candidate, remove_candidates=False)
                     self.players_standing_sort.pop(self.players_standing_sort.index(higher))
                     self.players_standing_sort.pop(self.players_standing_sort.index(p))
-                    print(f"Swapped player {p} for {swap_candidate} from matchup {to_modify} to {higher,p}")
+                    print(f"Swapped player {p} for {swap_candidate} from matchup {to_modify} to {higher, p}")
                     print(f"remaining: {self.players_standing_sort}")
                     return True
         return False
