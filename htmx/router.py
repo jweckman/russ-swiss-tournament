@@ -110,8 +110,10 @@ def get_round_input_context(
         black_full_name = [p for p in config.tournament.players if p.identifier == matchup_data.black_identifier]
         if black_full_name and len(black_full_name) == 1:
             matchup['black_full_name'] = black_full_name[0].get_full_name()
-        matchup['white_score'] = match_result_score_map[MatchResult(matchup_data.white_score)]
-        matchup['black_score'] = match_result_score_map[MatchResult(matchup_data.black_score)]
+        white_score = match_result_score_map[MatchResult(matchup_data.white_score)]
+        black_score = match_result_score_map[MatchResult(matchup_data.black_score)]
+        matchup['white_score'] = white_score if white_score is not None else ''
+        matchup['black_score'] = black_score if black_score is not None else ''
         matchup['white_identifier'] = matchup_data.white_identifier
         matchup['black_identifier'] = matchup_data.black_identifier
         matchups.append(matchup)
