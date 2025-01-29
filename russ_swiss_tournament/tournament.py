@@ -3,7 +3,7 @@ from pathlib import Path
 from collections import Counter
 import pprint
 from enum import Enum
-from typing import Self
+from typing import Self, Type, Tuple, cast
 import itertools
 
 from sqlmodel import select, col
@@ -12,10 +12,10 @@ from russ_swiss_tournament.round import Round, match_result_score_map
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament import tie_break
-from russ_swiss_tournament.service import MatchResult, Color, pairwise, split_list
+from russ_swiss_tournament.service import Color, split_list
 
 from htmx.db import get_session
-from htmx.models import TournamentModel, RoundModel, PlayerModel, MatchupModel, PlayerTournamentStartOrder
+from htmx.models import TournamentModel, PlayerTournamentStartOrder
 
 class RoundSystem(Enum):
     SWISS = 1
@@ -138,15 +138,17 @@ class Tournament:
 
     @classmethod
     def from_db(
-            cls,
+            cls: Type[Self],
             selves: list[Self] | list[int],
         ) -> Self:
         '''Writes/updates selves to db'''
         session = next(get_session())
-        is_ids = False
-        if isinstance(selves[0], int):
-            is_ids = True
-        ids = [t.id for t in selves] if not is_ids else selves
+        ids: list[int] = []
+        for t in selves:
+            if isinstance(t, cls):
+                ids.append(t.id)
+            elif isinstance(t, int):
+                ids.append(t)
         tournament_model = [t for t in session.exec(select(TournamentModel).where(col(TournamentModel.id).in_(ids)))][0]
         players = Player.from_db(tournament_model.players)[0]
         player_ids = [p.identifier for p in players]
@@ -158,7 +160,7 @@ class Tournament:
         ).all()
         start_order_ordered = sorted(start_order_db, key = lambda x: x.start_order)
         start_order_ordered_identifiers = [r.player_identifier for r in start_order_ordered]
-        tournament = Tournament(
+        tournament = cls(
             id = tournament_model.id,
             name = tournament_model.name,
             players = Player.from_db(tournament_model.players)[0],
@@ -172,7 +174,6 @@ class Tournament:
             player_tournament_start_order = start_order_ordered_identifiers,
         )
         return tournament
-
 
     @classmethod
     def create_players(cls, ids, first_names = None, last_names = None):
@@ -261,15 +262,20 @@ class Tournament:
             last_round_index = int(until)
         mm, solk = tie_break.calc_modified_median_solkoff(
             self.rounds[:last_round_index],
-            [p.identifier for p in self.players],
+            set([p.identifier for p in self.players]),
             self.get_opponents()
         )
         return mm, solk
 
     def get_tie_break_results_round_robin(self, until: str | int = 'latest') -> tuple[dict, dict]:
+        standings = self.get_standings(until=until)
+        if not standings:
+            raise ValueError(
+                "Could not get standings when getting tie break results. Should not happen."
+            )
         sonne, koya = tie_break.calc_sonne_koya(
             *self.get_player_defeated_drawn(until=until),
-            self.get_standings(until=until),
+            standings,
             len(self.rounds),
         )
         return sonne, koya
@@ -284,10 +290,11 @@ class Tournament:
         '''
         # TODO: add validation if faced twice
         player_ids = [p.identifier for p in self.players]
+        index: int
         if until == 'latest':
             index = len(self.rounds)
         else:
-            index = until
+            index = cast(int, until)
         results = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
         for r in self.rounds[:index]:
             for m in r.matchups:
@@ -303,7 +310,7 @@ class Tournament:
     def get_player_defeated_drawn(
             self,
             until: str | int = 'latest_complete'
-        ) -> (dict[int, list[list, list]], dict[int, dict[int, float]]):
+        ) -> Tuple[dict[int, list[list[int]]], dict[int, dict[int, float]]]:
         '''
         Returns
         1.  dict with player id as key and list of lists with
@@ -333,16 +340,17 @@ class Tournament:
             self,
             until: str | int = 'latest',
             used_assigner = None  # Can be used for debugging purposes
-        ) -> (dict[int, list[int]], set, set):
+        ) -> Tuple[dict[int, list[int]], set, set]:
         '''
         Encode white as 1 and black as -1.
         This way we can easily calculate preferred color.
         '''
         player_ids = [p.identifier for p in self.players]
+        index: int
         if until == 'latest':
             index = len(self.rounds)
         else:
-            index = until
+            index = cast(int, until)
         colors: dict[int, list] = {p: [] for p in player_ids}
         veto_black: set = set()
         veto_white: set = set()

@@ -1,5 +1,12 @@
 from enum import Enum
 
+class StartupMode(Enum):
+    INIT_SWISS = 1
+    INIT_ROUND_ROBIN = 2
+    START_FROM_DB = 3
+    INIT_DB_TABLES = 4
+    INIT_DB_TABLES_WITH_TEST_DATA = 5
+
 class MatchResult(Enum):
     WIN = 1
     LOSS = 2

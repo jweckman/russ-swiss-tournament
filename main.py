@@ -1,19 +1,12 @@
 from pathlib import Path
-from typing import Annotated
-from time import sleep
-from datetime import datetime
 
 import config
 
-from russ_swiss_tournament.tournament import Tournament
+from russ_swiss_tournament.tournament import Tournament, RoundSystem
 from russ_swiss_tournament.player import Player
-from russ_swiss_tournament.matchup import Matchup, PlayerMatch
-from russ_swiss_tournament.round import Round
-from russ_swiss_tournament.tie_break import calc_modified_median_solkoff
 from russ_swiss_tournament.matchup_assignment import SwissAssigner, RoundRobinAssigner
-from russ_swiss_tournament.db import Database
 from russ_swiss_tournament.cli import main
-from russ_swiss_tournament.service import MatchResult, Color
+from russ_swiss_tournament.service import StartupMode
 
 import htmx.router
 from htmx.db import create_db_and_tables, populate_test_data
@@ -36,8 +29,8 @@ def generate_round_robin_rounds():
         read_rounds = True,
         db = 'htmx',
     )
+    config.tournament = t
     # t.db_write([t])
-    return t
     # rra = RoudRobinAssigner(t)
     # rra.prepare_tournament_rounds()
     # for r in t.rounds:
@@ -49,27 +42,41 @@ def generate_round_robin_rounds():
 def generate_first_swiss_round():
     Player.read_players_from_csv()
     t = Tournament.from_toml(
-        Path.cwd() / 'tournaments' / 'russ_30' / 'config.toml',
+        Path.cwd() / 'tournaments' / 'russ_31' / 'config.toml',
         read_rounds = False,
         db = 'htmx',
     )
     t._create_initial_round()
     t.db_write([t])
-    return t
+    config.tournament = t
 
 def initialize_from_db():
     t = Tournament.from_db(
         [1]
     )
-    return t
+    if t.round_system == RoundSystem.SWISS:
+        config.assigner = SwissAssigner(t)
+    elif t.round_system == RoundSystem.BERGER:
+        config.assigner = RoundRobinAssigner(t)
 
-# config.tournament = generate_round_robin_rounds()
+    config.tournament = t
 
-# config.tournament = generate_first_swiss_round()
+def startup():
+    if config.mode == StartupMode.START_FROM_DB:
+        initialize_from_db()
+        init_htmx()
+    if config.mode == StartupMode.INIT_SWISS:
+        config.tournament = generate_first_swiss_round()
+    if config.mode == StartupMode.INIT_ROUND_ROBIN:
+        config.tournament = generate_round_robin_rounds()
+    if config.mode == StartupMode.INIT_DB_TABLES:
+        create_db_and_tables()
+    if config.mode == StartupMode.INIT_DB_TABLES_WITH_TEST_DATA:
+        create_db_and_tables()
+        populate_test_data()
 
-config.tournament = initialize_from_db()
-config.assigner = SwissAssigner(config.tournament)
-init_htmx()
+
+startup()
 
 if __name__ == "__main__":
     create_db_and_tables()

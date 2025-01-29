@@ -96,7 +96,7 @@ def get_round_input_context(
     if standings:
         player_ranks = list(standings.keys())
     for matchup_data in round_model_res.matchups:
-        matchup = dict()
+        matchup: dict[str, Any] = dict()
         if player_ranks:
             top_ranked_index = min([
                 player_ranks.index(matchup_data.white_identifier),
@@ -154,6 +154,10 @@ async def round_update(
         session: Session = Depends(get_session),
     ):
     round = config.tournament.get_round_by_index(round_id)
+    if not round:
+        raise ValueError(
+            f"Could find round with id {round_id} when updating rounds. This should not happen."
+        )
     form_data = await request.form()
     matchups: list = []
     for player, result in form_data.items():
@@ -161,6 +165,11 @@ async def round_update(
         player_identifier = player_parts[-1]
         is_black = player_parts[-2] == 'black'
         matchup = round.get_player_matchup(player_identifier)
+        if not matchup:
+            raise ValueError(
+                f"Could not get player matchup for player identifier {player_identifier} "
+                "when updating rounds. This should not happen."
+            )
         if is_black:
             matchup.res[Color.B].res = match_result_manual_map[result]
         else:
