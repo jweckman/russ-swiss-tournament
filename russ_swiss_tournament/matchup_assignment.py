@@ -1,9 +1,10 @@
 from random import shuffle
+from typing import Any
 
 from russ_swiss_tournament.tournament import Tournament
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.round import Round
-from russ_swiss_tournament.service import MatchResult, Color
+from russ_swiss_tournament.service import Color
 from russ_swiss_tournament.player import Player
 
 class SwissAssigner:
@@ -19,19 +20,20 @@ class SwissAssigner:
 
     def __init__(
             self,
-            tournament,
+            tournament: Tournament,
         ):
         colors, veto_white, veto_black = tournament.get_player_colors()
+        sorted_standings = tournament.get_sorted_standings()
         self.tournament = tournament
         self.opponents: dict[int, list[int]] = tournament.get_opponents()
         self.players_standing_sort: list | None = None
         self.matchup_colors: list[tuple[int, int]] = []
         self.already_paired: set = set()
-        self.top_players: list[int] = list(tournament.get_sorted_standings().keys())[:2] if tournament.get_sorted_standings() else []
+        self.top_players: list[int] = list(sorted_standings.keys())[:2] if sorted_standings else []
         self.colors = colors
         self.veto_white = veto_white
         self.veto_black = veto_black
-        self.last_assigned_pair_info = dict()  # Enable and use for debugging
+        self.last_assigned_pair_info: dict[str, Any] = dict()  # Enable and use for debugging
         self.relax_color_requirements: bool = False  # Intended to be enabled dynamically if solution can not be found
 
     def _assign_matchup_colors(self, higher: int, lower: int) -> tuple[int, int]:
@@ -186,7 +188,12 @@ class SwissAssigner:
             self.already_paired = set()
 
             self.opponents = self.tournament.get_opponents()
-            self.players_standing_sort = [p for p in self.tournament.get_sorted_standings()]
+            sorted_standings = self.tournament.get_sorted_standings()
+            if not sorted_standings:
+                raise ValueError(
+                    "Round color assignment requires standings"
+                )
+            self.players_standing_sort = [p for p in sorted_standings]
             if z == 1:
                 print("----------ATTEMPTING TO ASSIGN USING RELAXED COLOR REQUIREMENTS ONLY--------------")
                 self.relax_color_requirements = True
@@ -251,6 +258,10 @@ class SwissAssigner:
 
         Returns True if successful and False if swap failed.
         '''
+        if not self.players_standing_sort:
+            raise ValueError(
+                "Standings required before players can be swapped"
+            )
         whites = [m[0] for m in self.matchup_colors]
         whites_reversed = list(reversed(whites))
         blacks = [m[1] for m in self.matchup_colors]

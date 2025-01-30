@@ -3,6 +3,7 @@ import csv
 from typing import Self
 from io import StringIO
 from pathlib import Path
+from typing import Type, Any
 
 from sqlmodel import select, col
 
@@ -10,41 +11,9 @@ from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.db import Database
 from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
-from config import tournament
 
 from htmx.db import get_session
-from htmx.models import TournamentModel, RoundModel
-
-match_result_manual_map = {
-    1: MatchResult.WIN,
-    '1': MatchResult.WIN,
-    0: MatchResult.LOSS,
-    '0': MatchResult.LOSS,
-    0.5: MatchResult.DRAW,
-    '0.5': MatchResult.DRAW,
-    "0,5": MatchResult.DRAW,
-    "wo": MatchResult.WALKOVER,
-    "walkover": MatchResult.WALKOVER,
-    None: MatchResult.UNSET,
-    "": MatchResult.UNSET,
-    False: MatchResult.UNSET,
-}
-
-match_result_score_map = {
-    MatchResult.WIN:  1,
-    MatchResult.LOSS: 0,
-    MatchResult.DRAW: 0.5,
-    MatchResult.UNSET: None,
-    MatchResult.WALKOVER: 0,
-}
-
-match_result_score_text_map = {
-    MatchResult.WIN:  1,
-    MatchResult.LOSS: 0,
-    MatchResult.DRAW: 0.5,
-    MatchResult.UNSET: None,
-    MatchResult.WALKOVER: 'wo',
-}
+from htmx.models import RoundModel
 
 class Round:
     '''Note: index var starts from 1 to match with csv file names'''
@@ -106,14 +75,16 @@ class Round:
 
     @classmethod
     def from_db(
-            cls,
-            selves: list[Self] | list[int],
-        ) -> tuple[list[Self], list[RoundModel]]:
-        is_ids = False
-        if isinstance(selves[0], int):
-            is_ids = True
+        cls: Type[Self],
+        selves: list[Self] | list[int],
+    ) -> tuple[list[Self], list[RoundModel]]:
         session = next(get_session())
-        ids = [t.index for t in selves] if not is_ids else selves
+        ids: list[int] = []
+        for t in selves:
+            if isinstance(t, cls):
+                ids.append(t.id)
+            elif isinstance(t, int):
+                ids.append(t)
         existing_db = [t for t in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
         if len(existing_db) != len(selves):
             raise ValueError(
@@ -138,7 +109,7 @@ class Round:
             cls,
             s: str,
             players: list[Player]
-        ) -> Player:
+        ) -> Player | None:
         res = None
         sanitized = s.lower().strip()
         for p in players:
@@ -153,14 +124,14 @@ class Round:
             cls,
             path: str | Path | StringIO,
             index,
-            players: list[Player] | None = None
+            players: list[Player] = []
         ):
         matchups = []
+        csv_file: Any
         if isinstance(path, str) or isinstance(path, Path):
             csv_file = open(path, newline='')
         elif isinstance(path, StringIO):
             csv_file = path
-        # with open(path, newline='') as csv_file:
         try:
             round_reader = csv.reader(csv_file, delimiter=',', quotechar='"')
             headers = next(round_reader, None)
@@ -180,11 +151,11 @@ class Round:
                 })
                 matchups.append(matchup)
         finally:
-            if isinstance(csv_file, str) or isinstance(csv_file, Path):
+            if isinstance(path, str) or isinstance(path, Path):
                 csv_file.close()
         return cls(matchups, index)
 
-    def get_results(self) -> dict[int,float]:
+    def get_results(self) -> dict[int, float]:
         player_ids = self.get_player_ids()
         results = dict(zip(list(player_ids), [0 for i in range(len(player_ids))]))
         for m in self.matchups:

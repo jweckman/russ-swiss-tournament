@@ -1,7 +1,6 @@
-from enum import Enum
 from dataclasses import dataclass
 import itertools
-from typing import Self, Any
+from typing import Self, Any, Type, cast
 
 from sqlmodel import select, col
 
@@ -9,7 +8,7 @@ from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
 
 from htmx.db import get_session
-from htmx.models import MatchupModel, RoundModel
+from htmx.models import MatchupModel
 
 
 @dataclass
@@ -41,11 +40,13 @@ class Matchup:
             cls,
             selves: list[Self] | list[int],
         ) -> tuple[list[Self], list[MatchupModel]]:
-        is_ids = False
-        if isinstance(selves[0], int):
-            is_ids = True
         session = next(get_session())
-        ids = [m.id for m in selves] if not is_ids else selves
+        ids: list[int] = []
+        for m in selves:
+            if isinstance(m, MatchupModel):
+                ids.append(cast(int, m.id))
+            elif isinstance(m, int):
+                ids.append(m)
         existing_db = [m for m in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
         if len(existing_db) != len(selves):
             raise ValueError(
@@ -165,7 +166,7 @@ class Matchup:
         self.res[Color.W].res = white_res
         self.res[Color.B].res = black_res
 
-    def get_winner_loser_colors(self) -> (tuple[Color, Color] | None, bool):
+    def get_winner_loser_colors(self) -> tuple[tuple[Color, Color] | None, bool]:
         '''None means no winner. Winner first loser/walkover second in returned tuple'''
         winner_loser_colors = None
         is_walkover = {self.res[Color.W].res, self.res[Color.B].res} == {MatchResult.WIN, MatchResult.WALKOVER}
