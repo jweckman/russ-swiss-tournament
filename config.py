@@ -7,6 +7,8 @@ if TYPE_CHECKING:
 from russ_swiss_tournament.service import StartupMode
 
 mode = StartupMode.START_FROM_DB
+# mode = StartupMode.INIT_SWISS
+# mode = StartupMode.INIT_DB_TABLES
 
 tournament = cast("Tournament", None)
 assigner = cast("SwissAssigner | RoundRobinAssigner", None)
