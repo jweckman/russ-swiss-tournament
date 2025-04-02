@@ -2,10 +2,7 @@ import csv
 from pathlib import Path
 from typing import Self
 
-from sqlmodel import select, col
-
-from htmx.db import get_session
-from htmx.models import PlayerModel
+from russ_swiss_tournament.db import PlayerModel, upsert_records, get_records_by_id
 
 class Player:
     def __init__(
@@ -34,15 +31,14 @@ class Player:
             selves: list[Self] | list[int],
             all: bool = False,
         ) -> tuple[list[Self], list[PlayerModel]]:
-        session = next(get_session())
         if all:
-            existing_db = [p for p in session.exec(select(PlayerModel)).all()]
+            existing_db = get_records_by_id(PlayerModel, True)
         else:
             is_ids = False
             if isinstance(selves[0], int):
                 is_ids = True
             ids = [p.identifier for p in selves] if not is_ids else selves
-            existing_db = [p for p in session.exec(select(PlayerModel).where(col(PlayerModel.identifier).in_(ids)))]
+            existing_db = get_records_by_id(PlayerModel, ids)
             if len(existing_db) != len(selves):
                 raise ValueError(
                     f"Trying to create {cls.__name__} from db records but some ids are missing.\n"
@@ -57,7 +53,6 @@ class Player:
                     last_name = record.last_name,
                 )
             )
-        session.close()
         return objects, existing_db
 
     @classmethod
@@ -67,9 +62,8 @@ class Player:
             update: bool = True,
         ) -> list[PlayerModel]:
         '''Writes/updates selves to db'''
-        session = next(get_session())
         ids = [p.identifier for p in selves]
-        existing_db = [t for t in session.exec(select(PlayerModel).where(col(PlayerModel.identifier).in_(ids)))]
+        existing_db = get_records_by_id(PlayerModel, ids)
         existing_db_ids = [t.identifier for t in existing_db]
         records: list[PlayerModel] = []
         for t_obj in selves:
@@ -85,15 +79,9 @@ class Player:
                     last_name = t_obj.last_name,
                     active = t_obj.active,
                 )
-                session.add(new_record)
-                session.flush()
-                session.refresh(new_record)
-                if new_record.id is None:
-                    raise ValueError("Trying to create a player without an id")
+                upsert_records(PlayerModel, [new_record])
                 t_obj.identifier = new_record.identifier
-                session.commit()
                 records.append(new_record)
-        session.close()
         return records
 
     @classmethod

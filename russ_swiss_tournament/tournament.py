@@ -13,9 +13,8 @@ from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament import tie_break
 from russ_swiss_tournament.service import Color, split_list
+from russ_swiss_tournament.db import get_records_by_id, upsert_records, get_start_order_sorted, get_tournament_players, get_tournament_rounds, add_player_to_tournament, TournamentModel, PlayerTournamentStartOrder, RoundModel, PlayerModel
 
-from htmx.db import get_session
-from htmx.models import TournamentModel, PlayerTournamentStartOrder
 
 class RoundSystem(Enum):
     SWISS = 1
@@ -27,33 +26,36 @@ round_system_tie_break_map = {
     RoundSystem.BERGER: tie_break.TieBreakMethodRoundRobin,
 }
 
+
 class Tournament:
     '''player list should be sorted by ranking before start of tournament'''
     id_iter = itertools.count()
 
     def __init__(
-            self,
-            name: str,
-            players: list[Player],
-            rounds: list[Round],
-            round_count: int,
-            round_system: RoundSystem,
-            tie_break_results_swiss: dict[tie_break.TieBreakMethodSwiss, dict],
-            tie_break_results_round_robin: dict[tie_break.TieBreakMethodRoundRobin, dict],
-            year: int,
-            count: int,
-            id: int = -1,
-            create_players: bool = False,
-            folder: Path | None = None,
-            round_folder: Path | None = None,
-            player_tournament_start_order: list = [],
-        ):
+        self,
+        name: str,
+        players: list[Player],
+        rounds: list[Round],
+        round_count: int,
+        round_system: RoundSystem,
+        tie_break_results_swiss: dict[tie_break.TieBreakMethodSwiss, dict],
+        tie_break_results_round_robin: dict[tie_break.TieBreakMethodRoundRobin,
+                                            dict],
+        year: int,
+        count: int,
+        id: int = -1,
+        create_players: bool = False,
+        folder: Path | None = None,
+        round_folder: Path | None = None,
+        player_tournament_start_order: list = [],
+    ):
         if id == -1:
             self.id = next(self.id_iter)
         else:
             self.id = id
         self.name = name
-        self.players = self._order_players(players, player_tournament_start_order)
+        self.players = self._order_players(players,
+                                           player_tournament_start_order)
         self.rounds = rounds
         self.round_count = round_count
         self.round_system = round_system
@@ -66,7 +68,9 @@ class Tournament:
         self.player_tournament_start_order = player_tournament_start_order
 
     def __repr__(self):
-        return pprint.pformat([[m.res for m in r.matchups] for r in self.rounds], indent=4)
+        return pprint.pformat([[m.res for m in r.matchups]
+                               for r in self.rounds],
+                              indent=4)
 
     @property
     def rounds(self):
@@ -75,33 +79,34 @@ class Tournament:
     @rounds.setter
     def rounds(self, value):
         for i, round in enumerate(value):
-            if not round.index == i + 1:
+            if not round.round_index == i + 1:
                 raise ValueError(
                     "Round object indicies not in same order as tournament "
                     "level list object. This means some part of the code is "
-                    "not respecting this ordering and should be fixed."
-                )
+                    "not respecting this ordering and should be fixed.")
         self._rounds = value
 
     def _order_players(self, players: list, order: list[int]):
         if order:
             try:
-                players = sorted(players, key = lambda p: order.index(p.identifier))
+                players = sorted(players,
+                                 key=lambda p: order.index(p.identifier))
             except ValueError:
-                raise ValueError("Trying to order players but some ids do not exist in ordering.")
+                raise ValueError(
+                    "Trying to order players but some ids do not exist in ordering."
+                )
             pass
         return players
 
     @classmethod
     def db_write(
-            self,
-            selves: list[Self],
-            update: bool = True,
-        ) -> list[TournamentModel]:
+        self,
+        selves: list[Self],
+        update: bool = True,
+    ) -> list[TournamentModel]:
         '''Writes/updates selves to db'''
-        session = next(get_session())
         ids = [t.id for t in selves]
-        existing_db = [t for t in session.exec(select(TournamentModel).where(col(TournamentModel.id).in_(ids)))]
+        existing_db = get_records_by_id(TournamentModel, ids)
         existing_db_ids = [t.id for t in existing_db]
         new_records: list[TournamentModel] = []
         for t_obj in selves:
@@ -110,77 +115,88 @@ class Tournament:
                     pass  # TODO
             else:
                 new_record = TournamentModel(
-                    name = t_obj.name,
-                    year = t_obj.year,
-                    count = t_obj.count,
-                    round_count = t_obj.round_count,
-                    round_system = t_obj.round_system.value,
-                    players = Player.db_write(t_obj.players),
-                    rounds = Round.db_write(t_obj.rounds),
+                    id=t_obj.id,
+                    name=t_obj.name,
+                    year=t_obj.year,
+                    count=t_obj.count,
+                    round_count=t_obj.round_count,
+                    round_system=t_obj.round_system.value,
                 )
-                session.add(new_record)
-                session.flush()
-                session.refresh(new_record)
+                player_models = []
+                for player in t_obj.players:
+                    player_models.append(
+                        PlayerModel(
+                            identifier=player.identifier,
+                            first_name=player.first_name,
+                            last_name=player.last_name,
+                            active=player.active,
+                        ))
+                player_ids = [x.identifier for x in t_obj.players]
+                upsert_records(PlayerModel, player_models)
+                [add_player_to_tournament(x, t_obj.id) for x in player_ids]
+                round_models = []
+                Round.db_write(t_obj.rounds)
+                upsert_records(TournamentModel, [new_record])
                 for i, p in enumerate(t_obj.players):
                     start_order = PlayerTournamentStartOrder(
-                        start_order = i + 1,
-                        tournament_id = new_record.id,
-                        player_identifier = p.identifier,
+                        start_order=i + 1,
+                        tournament_id=new_record.id,
+                        player_identifier=p.identifier,
                     )
-                    session.add(start_order)
-                session.flush()
+                    upsert_records(PlayerTournamentStartOrder, [start_order])
                 if new_record.id is None:
-                    raise ValueError("Trying to create a tournament without an id")
+                    raise ValueError(
+                        "Trying to create a tournament without an id")
                 t_obj.id = new_record.id
-                session.commit()
                 new_records.append(new_record)
         return new_records
 
     @classmethod
     def from_db(
-            cls: Type[Self],
-            selves: list[Self] | list[int],
-        ) -> Self:
+        cls: Type[Self],
+        selves: list[Self] | list[int],
+    ) -> Self:
         '''Writes/updates selves to db'''
-        session = next(get_session())
         ids: list[int] = []
         for t in selves:
             if isinstance(t, cls):
                 ids.append(t.id)
             elif isinstance(t, int):
                 ids.append(t)
-        tournament_model = [t for t in session.exec(select(TournamentModel).where(col(TournamentModel.id).in_(ids)))][0]
-        players = Player.from_db(tournament_model.players)[0]
-        player_ids = [p.identifier for p in players]
-        start_order_db = session.exec(
-            select(PlayerTournamentStartOrder).where(
-                PlayerTournamentStartOrder.tournament_id == tournament_model.id,
-                col(PlayerTournamentStartOrder.player_identifier).in_(player_ids),
-            ).order_by(col(PlayerTournamentStartOrder.start_order).desc())
-        ).all()
-        start_order_ordered = sorted(start_order_db, key = lambda x: x.start_order)
-        start_order_ordered_identifiers = [r.player_identifier for r in start_order_ordered]
+        tournament_model = get_records_by_id(TournamentModel, ids)[0]
+        player_ids = get_tournament_players(tournament_model.id)
+        round_ids = get_tournament_rounds(tournament_model.id)
+        start_order_db = get_start_order_sorted(
+            tournament_id=tournament_model.id, player_ids=player_ids)
+        start_order_ordered = sorted(start_order_db,
+                                     key=lambda x: x.start_order)
+        start_order_ordered_identifiers = [
+            r.player_identifier for r in start_order_ordered
+        ]
         tournament = cls(
-            id = tournament_model.id,
-            name = tournament_model.name,
-            players = Player.from_db(tournament_model.players)[0],
-            rounds = Round.from_db([r.index for r in tournament_model.rounds])[0],
-            round_count = tournament_model.round_count,
-            round_system = RoundSystem.SWISS,
-            tie_break_results_swiss = dict(),
-            tie_break_results_round_robin = dict(),
-            year = tournament_model.year,
-            count = 30,  # TODO hard coded,
-            player_tournament_start_order = start_order_ordered_identifiers,
+            id=tournament_model.id,
+            name=tournament_model.name,
+            players=Player.from_db(player_ids)[0],
+            rounds=Round.from_db(round_ids)[0],
+            round_count=tournament_model.round_count,
+            round_system=RoundSystem.SWISS,
+            tie_break_results_swiss=dict(),
+            tie_break_results_round_robin=dict(),
+            year=tournament_model.year,
+            count=30,  # TODO hard coded,
+            player_tournament_start_order=start_order_ordered_identifiers,
         )
         return tournament
 
     @classmethod
-    def create_players(cls, ids, first_names = None, last_names = None):
+    def create_players(cls, ids, first_names=None, last_names=None):
         players = []
         if ids and not all([first_names, last_names]):
             for i, id in enumerate(ids):
-                players.append(Player(identifier=id, first_name=f"p{i}f", last_name=f"p{i}l"))
+                players.append(
+                    Player(identifier=id,
+                           first_name=f"p{i}f",
+                           last_name=f"p{i}l"))
         else:
             # TODO: allow creating based on names as well
             pass
@@ -190,7 +206,9 @@ class Tournament:
     def read_rounds(cls, round_folder, players):
         rdir = round_folder
         csv_files = [rf for rf in rdir.iterdir() if rf.suffix == '.csv']
-        csv_files = sorted(csv_files, key = lambda x: int(''.join(c for c in x.stem if c.isdigit())))
+        csv_files = sorted(csv_files,
+                           key=lambda x: int(''.join(c for c in x.stem
+                                                     if c.isdigit())))
 
         rounds = []
         for i, f in enumerate(csv_files):
@@ -199,16 +217,17 @@ class Tournament:
 
     @classmethod
     def from_toml(
-            cls,
-            path,
-            read_rounds = True,
-            create_players = False,
-            db = None,
-            players_manual = [],
-        ):
+        cls,
+        path,
+        read_rounds=True,
+        create_players=False,
+        db=None,
+        players_manual=[],
+    ):
         with open(path, mode="rb") as fp:
             toml_conf = tomli.load(fp)
-        round_path = Path().cwd() / 'tournaments' / toml_conf['general']['folder'] / toml_conf['general']['round_folder']
+        round_path = Path().cwd() / 'tournaments' / toml_conf['general'][
+            'folder'] / toml_conf['general']['round_folder']
 
         rounds = []
         player_ids = toml_conf['players']['ids']
@@ -222,14 +241,21 @@ class Tournament:
         if read_rounds:
             rounds = cls.read_rounds(round_path, players)
         swiss_tie_break = toml_conf['general'].get('tie_break_methods_swiss')
-        round_robin_tie_break = toml_conf['general'].get('tie_break_methods_round_robin')
+        round_robin_tie_break = toml_conf['general'].get(
+            'tie_break_methods_round_robin')
         try:
             if swiss_tie_break:
-                used_swiss = [getattr(tie_break.TieBreakMethodSwiss, x.upper()) for x in swiss_tie_break]
+                used_swiss = [
+                    getattr(tie_break.TieBreakMethodSwiss, x.upper())
+                    for x in swiss_tie_break
+                ]
             else:
                 used_swiss = []
             if round_robin_tie_break:
-                used_round_robin = [getattr(tie_break.TieBreakMethodRoundRobin, x.upper()) for x in round_robin_tie_break]
+                used_round_robin = [
+                    getattr(tie_break.TieBreakMethodRoundRobin, x.upper())
+                    for x in round_robin_tie_break
+                ]
             else:
                 used_round_robin = []
         except AttributeError as e:
@@ -241,33 +267,38 @@ class Tournament:
         rs = getattr(RoundSystem, toml_conf['general']['round_system'].upper())
 
         return cls(
-            name = toml_conf['general']['title'],
-            players = players,
-            rounds = rounds,
-            round_count = toml_conf['general']['rounds'],
-            round_system = rs,
-            tie_break_results_swiss = {x: None for x in used_swiss},
-            tie_break_results_round_robin = {x: None for x in used_round_robin},
-            year = toml_conf['general']['year'],
-            count = toml_conf['general']['count'],
-            folder = Path().cwd() / 'tournaments' / toml_conf['general']['folder'],
-            round_folder = round_path,
-            player_tournament_start_order = start_order,
+            name=toml_conf['general']['title'],
+            players=players,
+            rounds=rounds,
+            round_count=toml_conf['general']['rounds'],
+            round_system=rs,
+            tie_break_results_swiss={x: None
+                                     for x in used_swiss},
+            tie_break_results_round_robin={x: None
+                                           for x in used_round_robin},
+            year=toml_conf['general']['year'],
+            count=toml_conf['general']['count'],
+            folder=Path().cwd() / 'tournaments' /
+            toml_conf['general']['folder'],
+            round_folder=round_path,
+            player_tournament_start_order=start_order,
         )
 
-    def get_tie_break_results_swiss(self, until: str | int = 'latest') -> tuple[dict, dict]:
+    def get_tie_break_results_swiss(self,
+                                    until: str | int = 'latest'
+                                    ) -> tuple[dict, dict]:
         if until == 'latest':
             last_round_index = self.get_last_complete_round_index()
         else:
             last_round_index = int(until)
         mm, solk = tie_break.calc_modified_median_solkoff(
             self.rounds[:last_round_index],
-            set([p.identifier for p in self.players]),
-            self.get_opponents()
-        )
+            set([p.identifier for p in self.players]), self.get_opponents())
         return mm, solk
 
-    def get_tie_break_results_round_robin(self, until: str | int = 'latest') -> tuple[dict, dict]:
+    def get_tie_break_results_round_robin(self,
+                                          until: str | int = 'latest'
+                                          ) -> tuple[dict, dict]:
         standings = self.get_standings(until=until)
         if not standings:
             raise ValueError(
@@ -281,10 +312,10 @@ class Tournament:
         return sonne, koya
 
     def get_opponents(
-            self,
-            until: str | int = 'latest',
-            inverse: bool = False,
-        ) -> dict[int, list[int]]:
+        self,
+        until: str | int = 'latest',
+        inverse: bool = False,
+    ) -> dict[int, list[int]]:
         '''
         Possible to get unplayed by setting inverse boolean to True.
         '''
@@ -295,22 +326,27 @@ class Tournament:
             index = len(self.rounds)
         else:
             index = cast(int, until)
-        results = dict(zip(list(player_ids), [[] for i in range(len(player_ids))]))
+        results = dict(
+            zip(list(player_ids), [[] for i in range(len(player_ids))]))
         for r in self.rounds[:index]:
             for m in r.matchups:
-                results[m.res[Color.W].player.identifier].append(m.res[Color.B].player.identifier)
-                results[m.res[Color.B].player.identifier].append(m.res[Color.W].player.identifier)
+                results[m.res[Color.W].player.identifier].append(
+                    m.res[Color.B].player.identifier)
+                results[m.res[Color.B].player.identifier].append(
+                    m.res[Color.W].player.identifier)
         if inverse:
             for player, opponents in results.copy().items():
                 players_minus_self = [p for p in player_ids if p != player]
-                results[player] = [p for p in players_minus_self if p not in opponents]
+                results[player] = [
+                    p for p in players_minus_self if p not in opponents
+                ]
 
         return results
 
     def get_player_defeated_drawn(
-            self,
-            until: str | int = 'latest_complete'
-        ) -> Tuple[dict[int, list[list[int]]], dict[int, dict[int, float]]]:
+        self,
+        until: str | int = 'latest_complete'
+    ) -> Tuple[dict[int, list[list[int]]], dict[int, dict[int, float]]]:
         '''
         Returns
         1.  dict with player id as key and list of lists with
@@ -318,29 +354,37 @@ class Tournament:
         2.  dict with player id as key and dict containins match results by opponent.
         '''
         player_ids = [p.identifier for p in self.players]
-        pdd = dict(zip(list(player_ids), [[[], []] for i in range(len(player_ids))]))
-        pdd_scores = dict(zip(list(player_ids), [dict() for i in range(len(player_ids))]))
+        pdd = dict(
+            zip(list(player_ids), [[[], []] for i in range(len(player_ids))]))
+        pdd_scores = dict(
+            zip(list(player_ids), [dict() for i in range(len(player_ids))]))
         for r in self.rounds[:self._until_to_index(until)]:
             for m in r.matchups:
                 score_white = match_result_score_map[m.res[Color.W].res]
                 score_black = match_result_score_map[m.res[Color.B].res]
                 if score_white == 1:
-                    pdd[m.res[Color.W].player.identifier][0].append(m.res[Color.B].player.identifier)
+                    pdd[m.res[Color.W].player.identifier][0].append(
+                        m.res[Color.B].player.identifier)
                 if score_white == 0.5:
-                    pdd[m.res[Color.W].player.identifier][1].append(m.res[Color.B].player.identifier)
-                pdd_scores[m.res[Color.W].player.identifier][m.res[Color.B].player.identifier] = score_white
+                    pdd[m.res[Color.W].player.identifier][1].append(
+                        m.res[Color.B].player.identifier)
+                pdd_scores[m.res[Color.W].player.identifier][m.res[
+                    Color.B].player.identifier] = score_white
                 if score_black == 1:
-                    pdd[m.res[Color.B].player.identifier][0].append(m.res[Color.W].player.identifier)
+                    pdd[m.res[Color.B].player.identifier][0].append(
+                        m.res[Color.W].player.identifier)
                 if score_white == 0.5:
-                    pdd[m.res[Color.B].player.identifier][1].append(m.res[Color.W].player.identifier)
-                pdd_scores[m.res[Color.B].player.identifier][m.res[Color.W].player.identifier] = score_black
+                    pdd[m.res[Color.B].player.identifier][1].append(
+                        m.res[Color.W].player.identifier)
+                pdd_scores[m.res[Color.B].player.identifier][m.res[
+                    Color.W].player.identifier] = score_black
         return pdd, pdd_scores
 
     def get_player_colors(
-            self,
-            until: str | int = 'latest',
-            used_assigner = None  # Can be used for debugging purposes
-        ) -> Tuple[dict[int, list[int]], set, set]:
+        self,
+        until: str | int = 'latest',
+        used_assigner=None  # Can be used for debugging purposes
+    ) -> Tuple[dict[int, list[int]], set, set]:
         '''
         Encode white as 1 and black as -1.
         This way we can easily calculate preferred color.
@@ -358,6 +402,7 @@ class Tournament:
         for r in self.rounds[:index]:
             for m in r.matchups:
                 white_id, black_id = m.get_player_ids()
+                print(f"white: {white_id}, black: {black_id}")
                 colors[white_id].append(1)
                 colors[black_id].append(-1)
         if index > 2:
@@ -368,7 +413,9 @@ class Tournament:
                     #     "This must not happen, review the code and make sure this is corrected "
                     #     "in the next round."
                     # )
-                    print(f"WARNING: Player {player_id} has played four consecutive rounds with the same color")
+                    print(
+                        f"WARNING: Player {player_id} has played four consecutive rounds with the same color"
+                    )
                 last_three = sum(player_colors[-3:])
                 if last_three == 3:
                     veto_white.add(player_id)
@@ -402,8 +449,7 @@ class Tournament:
 
     def get_standings(
             self,
-            until: str | int = 'latest_complete'
-        ) -> dict[int, float] | None:
+            until: str | int = 'latest_complete') -> dict[int, float] | None:
         '''
         Get entire tournament standings until chosen round. Defaults to latest complete results.
         Round index is 1 based
@@ -432,13 +478,11 @@ class Tournament:
     def sort_standings(
             self,
             standings: dict[int, float],
-            until: str | int = 'latest_complete'
-        ) -> dict[int, float] | None:
+            until: str | int = 'latest_complete') -> dict[int, float] | None:
         # TODO: do not use hard-coded sonneborn-berger as sorting tie-break, should be dynamic
-        if (
-                not standings
-                or (isinstance(standings, dict) and any([v is None for v in standings.values()]))
-            ):
+        if (not standings
+                or (isinstance(standings, dict)
+                    and any([v is None for v in standings.values()]))):
             return None
         index = self._until_to_index(until)
         if index:
@@ -446,11 +490,17 @@ class Tournament:
         else:
             sonne = None
         if not sonne:
-            res = {k: v for k, v in sorted(standings.items(), key=lambda item: item[1], reverse=True)}
+            res = {
+                k: v
+                for k, v in sorted(
+                    standings.items(), key=lambda item: item[1], reverse=True)
+            }
         else:
             res = {
-                k: v for k, v in sorted(
-                    standings.items(), key=lambda item: (
+                k: v
+                for k, v in sorted(
+                    standings.items(),
+                    key=lambda item: (
                         round(
                             item[1],
                             2,
@@ -461,15 +511,13 @@ class Tournament:
                         ),
                         -self.player_tournament_start_order.index(item[0]),
                     ),
-                    reverse=True
-                )
+                    reverse=True)
             }
         return res
 
     def get_sorted_standings(
             self,
-            until: str | int = 'latest_complete'
-        ) -> dict[int, float] | None:
+            until: str | int = 'latest_complete') -> dict[int, float] | None:
         standings = self.get_standings(until)
         if standings:
             standings = self.sort_standings(standings, until)
@@ -479,7 +527,7 @@ class Tournament:
         for round in self.rounds:
             if not round.is_complete():
                 raise ValueError(
-                    f"Round {round.index} contains unset results, cannot continue."
+                    f"Round {round.round_index} contains unset results, cannot continue."
                 )
 
     def validate_no_duplicate_matchups(self):
@@ -493,7 +541,7 @@ class Tournament:
                 player_ids = set(mu.get_player_ids())
                 if player_ids in matchups:
                     raise ValueError(
-                        f"Round {round.index}\n{mu}\nis a duplicate.\n"
+                        f"Round {round.round_index}\n{mu}\nis a duplicate.\n"
                         "This is not allowed in Swiss tournament generation.\n"
                         "Last tournament round was removed from the tournament."
                     )
@@ -504,10 +552,10 @@ class Tournament:
     def get_last_complete_round_index(self) -> int | None:
         if not self.rounds:
             return None
-        sorted_rounds = sorted(self.rounds, key = lambda x: x.index)
+        sorted_rounds = sorted(self.rounds, key=lambda x: x.round_index)
         complete_rounds = [r for r in sorted_rounds if r.is_complete()]
         if complete_rounds:
-            return complete_rounds[-1].index
+            return complete_rounds[-1].round_index
         else:
             return None
 
@@ -515,7 +563,9 @@ class Tournament:
         try:
             round = self.rounds[index - 1]
         except IndexError:
-            print(f"Warning: Tried to access round index {index} that does not exist")
+            print(
+                f"Warning: Tried to access round index {index} that does not exist"
+            )
             return None
         return round
 
@@ -525,11 +575,12 @@ class Tournament:
         first, second = split_list(self.players.copy(), middle_index)
         matchups = []
         for i, p in enumerate(first):
-            matchups.append(Matchup({
-                Color.W: PlayerMatch(second[i]),
-                Color.B: PlayerMatch(p)}
-            ))
-        new_round = Round(matchups, index = 1)
+            matchups.append(
+                Matchup({
+                    Color.W: PlayerMatch(second[i]),
+                    Color.B: PlayerMatch(p)
+                }))
+        new_round = Round(matchups, round_index=1)
         self.rounds.append(new_round)
         return new_round
 
@@ -543,6 +594,10 @@ class Tournament:
         try:
             player = [p for p in self.players if p.identifier == identifier][0]
         except IndexError:
-            raise IndexError(f"No player was found in the database with identifier {identifier}")
+            raise IndexError(
+                f"No player was found in the database with identifier {identifier}"
+            )
         return player
 
+    def get_player_full_names_by_id(self) -> dict[int, str]:
+        return {p.identifier: p.get_full_name() for p in self.players}

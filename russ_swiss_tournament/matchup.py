@@ -2,13 +2,9 @@ from dataclasses import dataclass
 import itertools
 from typing import Self, Any, Type, cast
 
-from sqlmodel import select, col
-
 from russ_swiss_tournament.player import Player
 from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
-
-from htmx.db import get_session
-from htmx.models import MatchupModel
+from russ_swiss_tournament.db import get_records_by_id, upsert_records, MatchupModel
 
 
 @dataclass
@@ -40,14 +36,13 @@ class Matchup:
             cls,
             selves: list[Self] | list[int],
         ) -> tuple[list[Self], list[MatchupModel]]:
-        session = next(get_session())
         ids: list[int] = []
         for m in selves:
             if isinstance(m, MatchupModel):
                 ids.append(cast(int, m.id))
             elif isinstance(m, int):
                 ids.append(m)
-        existing_db = [m for m in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
+        existing_db = get_records_by_id(MatchupModel, ids)
         if len(existing_db) != len(selves):
             raise ValueError(
                 f"Trying to create {cls.__name__} from db records but some ids are missing.\n"
@@ -64,20 +59,18 @@ class Matchup:
                     res = matchup,
                 )
             )
-        session.close()
         return objects, existing_db
 
     @classmethod
     def db_write(
             self,
             selves: list[Self],
+            round_id: int,
             update: bool = False,
-            round_id: int | None = None,
         ) -> list[MatchupModel]:
         '''Writes/updates selves to db'''
-        session = next(get_session())
         ids = [m.id for m in selves]
-        existing_db = [m for m in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
+        existing_db = get_records_by_id(MatchupModel, ids)
         existing_db_ids = [m.id for m in existing_db]
         if existing_db and not update:
             raise ValueError(
@@ -94,27 +87,21 @@ class Matchup:
                 matchup_model = existing_db[existing_db_ids.index(t_obj.id)]
                 matchup_model.white_score = t_obj.res[Color.W].res.value
                 matchup_model.black_score = t_obj.res[Color.B].res.value
-                session.add(matchup_model)
-                session.commit()
-                session.refresh(matchup_model)
+                upsert_records(MatchupModel, [matchup_model])
             else:
                 new_record = MatchupModel(
+                    id = t_obj.id,
                     white_identifier = t_obj.res[Color.W].player.identifier,
                     black_identifier = t_obj.res[Color.B].player.identifier,
                     white_score = t_obj.res[Color.W].res.value,
                     black_score = t_obj.res[Color.B].res.value,
+                    round_id = round_id,
                 )
-                if round_id:
-                    new_record.round_id = round_id
-                session.add(new_record)
-                session.flush()
-                session.refresh(new_record)
                 if new_record.id is None:
                     raise ValueError("Trying to create a matchup without an id")
+                upsert_records(MatchupModel, [new_record])
                 t_obj.id = new_record.id
-                session.commit()
                 db_records.append(new_record)
-        session.close()
         return db_records
 
     def __str__(self):

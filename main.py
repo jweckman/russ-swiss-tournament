@@ -4,23 +4,11 @@ import config
 
 from russ_swiss_tournament.tournament import Tournament, RoundSystem
 from russ_swiss_tournament.player import Player
+from russ_swiss_tournament.matchup import Matchup
 from russ_swiss_tournament.matchup_assignment import SwissAssigner, RoundRobinAssigner
-from russ_swiss_tournament.cli import main
+from gui_tkinter.gui import tkinter_main
 from russ_swiss_tournament.service import StartupMode
 
-import htmx.router
-from htmx.db import create_db_and_tables, populate_test_data
-
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-
-def init_htmx():
-    '''Run application with web front-end'''
-    global app
-    app = FastAPI(default_response_class=HTMLResponse)
-    app.include_router(htmx.router.router)
-    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 def generate_round_robin_rounds():
     Player.read_players_from_csv()
@@ -64,7 +52,7 @@ def initialize_from_db():
 def startup():
     if config.mode == StartupMode.START_FROM_DB:
         initialize_from_db()
-        init_htmx()
+        tkinter_main()
     if config.mode == StartupMode.INIT_SWISS:
         config.tournament = generate_first_swiss_round()
     if config.mode == StartupMode.INIT_ROUND_ROBIN:
@@ -76,8 +64,5 @@ def startup():
         populate_test_data()
 
 
-startup()
-
 if __name__ == "__main__":
-    create_db_and_tables()
-    populate_test_data()
+    startup()

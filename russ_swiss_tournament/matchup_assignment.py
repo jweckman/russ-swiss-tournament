@@ -318,7 +318,7 @@ class SwissAssigner:
                 )
             new_round = Round(
                 matchups,
-                index = self.tournament.rounds[-1].index + 1,
+                round_index = self.tournament.rounds[-1].round_index + 1,
             )
             self.tournament.rounds.append(new_round)
             # Make sure there are no unevenly assigned matchups
