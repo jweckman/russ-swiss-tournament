@@ -1,27 +1,29 @@
-[tool.poetry]
+[project]
 name = "russ-swiss-tournament"
 version = "0.1.0"
 description = ""
-authors = ["Joakim Weckman <joakim.weckman@gmail.com>"]
 readme = "README.md"
-packages = [{include = "russ_swiss_tournament"}]
+requires-python = ">=3.10"
+authors = [
+    { name = "Joakim Weckman", email = "joakim.weckman@gmail.com" }
+]
+dependencies = [
+    "fastapi",
+    "sqlmodel",
+    "uvicorn",
+    "jinja2",
+    "pytailwindcss",
+    "python-multipart",
+    "tomli",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-pytest = "^7.2.1"
-tomli = "^2.0.1"
-fastapi = "^0.104.1"
-sqlmodel = "^0.0.14"
-uvicorn = "^0.24.0.post1"
-jinja2 = "^3.1.2"
-pytailwindcss = "^0.2.0"
-python-multipart = "^0.0.6"
-
-
-[tool.poetry.group.dev.dependencies]
-pytest-profiling = "^1.8.1"
-pyinstrument = "^5.0.1"
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-profiling",
+    "pyinstrument",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
