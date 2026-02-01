@@ -1,0 +1,102 @@
+<div class="max-w-4xl mx-auto">
+    {% if warning %}
+        <div class="mb-6 bg-orange-50 border-l-4 border-orange-500 text-orange-700 p-4 shadow-sm flex items-start gap-3" role="alert">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+                <p class="font-bold">Action Required</p>
+                <p class="text-sm">{{ warning }}</p>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="mb-8 border-b border-gray-200 pb-4">
+        <h2 class="text-2xl font-bold text-gray-800">Tournament Databases</h2>
+        <p class="text-gray-500">Manage and switch between different tournament files.</p>
+    </div>
+
+    <div class="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm">
+        <div>
+            <h3 class="font-bold text-gray-800 text-lg">Create New Tournament</h3>
+            <p class="text-sm text-gray-500 mt-1">Initialize a new database with players and rules.</p>
+        </div>
+        <button
+            hx-get="/create_tournament_form"
+            hx-target="#main-view"
+            class="bg-gray-800 hover:bg-black text-white font-bold py-2 px-6 rounded shadow-sm transition-colors">
+            + Create New
+        </button>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="font-bold text-gray-700">Available Databases</h3>
+        </div>
+        <ul class="divide-y divide-gray-100" id="db-list">
+            {% for db in databases %}
+            <li class="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors duration-150 {% if db == current_db %}bg-gray-50 !border-l-4 !border-l-gray-800{% endif %}">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-white border border-gray-200 rounded text-gray-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5V19C3 20.1046 7.02944 21 12 21C16.9706 21 21 20.1046 21 19V5"/><path d="M21 5C21 6.10457 16.9706 7 12 7C7.02944 7 3 6.10457 3 5"/><path d="M3 12C3 13.1046 7.02944 14 12 14C16.9706 14 21 13.1046 21 12"/></svg>
+                    </div>
+                    <div>
+                        <span class="block font-bold text-gray-800">{{ db }}</span>
+                        {% if db == current_db %}
+                        <span class="text-xs font-bold text-green-600 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-green-600"></span> Active
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-gray-400">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    {% if db != current_db %}
+                    <form hx-post="/db_select" hx-target="#main-view" class="m-0">
+                        <input type="hidden" name="db_name" value="{{ db }}">
+                        <button type="submit"
+                                class="bg-white border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 font-bold py-1.5 px-4 rounded text-sm transition-colors shadow-sm">
+                            Select
+                        </button>
+                    </form>
+
+                    <form hx-post="/db_delete"
+                          hx-target="#main-view"
+                          hx-confirm="Are you absolutely sure you want to PERMANENTLY delete '{{ db }}'? This action cannot be undone."
+                          class="m-0">
+                        <input type="hidden" name="db_name" value="{{ db }}">
+                        <button type="submit"
+                                class="bg-red-600 text-white hover:bg-red-700 border border-red-700 font-bold py-1.5 px-3 rounded text-sm transition-colors shadow-sm"
+                                title="Delete Database">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        </button>
+                    </form>
+
+                    {% else %}
+                    <form hx-post="/db_select" hx-target="#main-view" class="m-0">
+                        <input type="hidden" name="db_name" value="{{ db }}">
+                        <button type="submit"
+                                class="bg-gray-100 border border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 hover:text-black font-bold py-1.5 px-4 rounded text-sm transition-colors shadow-sm flex items-center gap-2"
+                                title="Resume editing this tournament">
+                            <span>Open</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </button>
+                    </form>
+
+                    <button disabled class="opacity-25 cursor-not-allowed bg-white border border-gray-200 text-gray-300 font-bold py-1.5 px-3 rounded text-sm" title="Cannot delete active database">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    </button>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+            {% if not databases %}
+            <li class="p-8 text-center text-gray-400 italic">
+                No databases found in /databases folder.
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>

@@ -1,15 +1,9 @@
 from dataclasses import dataclass
 import itertools
-from typing import Self, Any, Type, cast
-
-from sqlmodel import select, col
+from typing import Any, Optional
 
 from russ_swiss_tournament.player import Player
-from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
-
-from htmx.db import get_session
-from htmx.models import MatchupModel
-
+from russ_swiss_tournament.service import MatchResult, Color, match_result_score_text_map
 
 @dataclass
 class PlayerMatch:
@@ -22,8 +16,14 @@ class Matchup:
     def __init__(
             self,
             res: dict[Color, PlayerMatch],
+            id: Optional[int] = None
         ):
-        self.id = next(self.id_iter) + 1
+        # If no ID is provided (new matchup), generate a temporary internal one 
+        # just for runtime uniqueness until saved to DB.
+        if id is None:
+             self.id = next(self.id_iter) + 1
+        else:
+             self.id = id
         self.res = res
 
     @property
@@ -34,100 +34,6 @@ class Matchup:
     def res(self, value):
         self.validate_result(value)
         self._res = value
-
-    @classmethod
-    def from_db(
-            cls,
-            selves: list[Self] | list[int],
-        ) -> tuple[list[Self], list[MatchupModel]]:
-        session = next(get_session())
-        ids: list[int] = []
-        for m in selves:
-            if isinstance(m, MatchupModel):
-                ids.append(cast(int, m.id))
-            elif isinstance(m, int):
-                ids.append(m)
-        existing_db = [m for m in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
-        if len(existing_db) != len(selves):
-            raise ValueError(
-                f"Trying to create {cls.__name__} from db records but some ids are missing.\n"
-                f"Please make sure that all the following ids are in the db: {ids}"
-            )
-        objects: list = []
-        for record in existing_db:
-            matchup = {
-                Color.W: PlayerMatch(Player.from_db([record.white_identifier])[0][0], MatchResult(record.white_score)),
-                Color.B: PlayerMatch(Player.from_db([record.black_identifier])[0][0], MatchResult(record.black_score))
-            }
-            objects.append(
-                Matchup(
-                    res = matchup,
-                )
-            )
-        session.close()
-        return objects, existing_db
-
-    @classmethod
-    def db_write(
-            self,
-            selves: list[Self],
-            update: bool = False,
-            round_id: int | None = None,
-        ) -> list[MatchupModel]:
-        '''Writes/updates selves to db'''
-        session = next(get_session())
-        ids = [m.id for m in selves]
-        existing_db = [m for m in session.exec(select(MatchupModel).where(col(MatchupModel.id).in_(ids)))]
-        existing_db_ids = [m.id for m in existing_db]
-        if existing_db and not update:
-            raise ValueError(
-                "Writing existing ids to db without update flag enabled. Terminating."
-            )
-        if update and len(existing_db_ids) != len(ids):
-            raise ValueError(
-                "Trying to update and create matchup model at the same time which is not allowed.\n"
-                f"Trying to create: {[id for id in ids if id not in existing_db_ids]}"
-            )
-        db_records: list = []
-        for t_obj in selves:
-            if t_obj.id in existing_db_ids:
-                matchup_model = existing_db[existing_db_ids.index(t_obj.id)]
-                matchup_model.white_score = t_obj.res[Color.W].res.value
-                matchup_model.black_score = t_obj.res[Color.B].res.value
-                session.add(matchup_model)
-                session.commit()
-                session.refresh(matchup_model)
-            else:
-                new_record = MatchupModel(
-                    white_identifier = t_obj.res[Color.W].player.identifier,
-                    black_identifier = t_obj.res[Color.B].player.identifier,
-                    white_score = t_obj.res[Color.W].res.value,
-                    black_score = t_obj.res[Color.B].res.value,
-                )
-                if round_id:
-                    new_record.round_id = round_id
-                session.add(new_record)
-                session.flush()
-                session.refresh(new_record)
-                if new_record.id is None:
-                    raise ValueError("Trying to create a matchup without an id")
-                t_obj.id = new_record.id
-                session.commit()
-                db_records.append(new_record)
-        session.close()
-        return db_records
-
-    def __str__(self):
-        white = self.res[Color.W]
-        black = self.res[Color.B]
-        white_name = white.player.get_full_name() or white.player.identifier
-        black_name = black.player.get_full_name() or white.player.identifier
-        res_white = match_result_score_text_map[white.res]
-        res_black = match_result_score_text_map[black.res]
-        w = f"{white_name.ljust(20)} {str(res_white).ljust(2)}"
-        b = f"{black_name.ljust(20)} {str(res_black).ljust(2)}"
-        res = f"{w} -    {b}"
-        return res
 
     def validate_result(self, value):
         ok = [
@@ -179,6 +85,18 @@ class Matchup:
     def get_player_ids(self):
         return self.res[Color.W].player.identifier, self.res[Color.B].player.identifier
 
+    def get_white_id(self) -> int:
+        return self.res[Color.W].player.identifier
+
+    def get_black_id(self) -> int:
+        return self.res[Color.B].player.identifier
+
+    def get_white_score_int(self) -> int:
+        return self.res[Color.W].res.value
+
+    def get_black_score_int(self) -> int:
+        return self.res[Color.B].res.value
+
     def to_dict(self) -> dict[str, Any]:
         res = dict()
         white = self.res[Color.W]
@@ -189,4 +107,16 @@ class Matchup:
         res['black_name'] = black.player.get_full_name()
         res['white_score'] = match_result_score_text_map[white.res]
         res['black_score'] = match_result_score_text_map[black.res]
+        return res
+
+    def __str__(self):
+        white = self.res[Color.W]
+        black = self.res[Color.B]
+        white_name = white.player.get_full_name() or white.player.identifier
+        black_name = black.player.get_full_name() or white.player.identifier
+        res_white = match_result_score_text_map[white.res]
+        res_black = match_result_score_text_map[black.res]
+        w = f"{white_name.ljust(20)} {str(res_white).ljust(2)}"
+        b = f"{black_name.ljust(20)} {str(res_black).ljust(2)}"
+        res = f"{w} -    {b}"
         return res

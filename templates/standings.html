@@ -2,37 +2,33 @@
   {% include "tab_all.html" %}
 {% endwith %}
 
-<p class="text-lg text-center">Standings</p>
-<div class="text-center">
-  <table class="w-full">
-    <tr>
-      {% for col in columns %}
-        <th>{{col}}</th>
-      {% endfor %}
-    </tr>
-    {% for s in standings %}
-      <div class="flex gap-2">
-        <tr>
-        <td>{{loop.index}}</td>
-        <td>
-          <div class="remove-all"
-            <button
-              _="on mouseenter add .bg-gray-500 to me end
-                  on mouseleave remove .bg-gray-500 from me end"
-              hx-get="/player_rounds_modal/{{s.identifier}}"
-              hx-target="body"
-              hx-swap="beforeend">{{s.name}}
-            </button>
-          </div>
-        </td>
-        <td>{{s.score}}</td>
-        {% if s['tie_breaks'] %}
-          {% for tb_name, tb_value in s.tie_breaks.items() %}
-            <td>{{tb_value}}</td>
-          {% endfor %}
-        {% endif %}
-        </tr>
-      </div>
-    {% endfor %}
-  </table>
+<div class="mt-4 bg-white shadow rounded-lg overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                {% for col in columns %}
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {{ col }}
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for row in standings %}
+            <tr class="hover:bg-gray-50 cursor-pointer"
+                hx-get="/player_rounds_modal/{{ row.identifier }}"
+                hx-target="body"
+                hx-swap="beforeend"
+            >
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ loop.index }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ row.name }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">{{ row.score }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.tie_breaks['Sonneborn-Berger']|round(2) }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.tie_breaks['Koya']|round(2) }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.tie_breaks['Modified Median']|round(2) }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ row.tie_breaks['Solkoff']|round(2) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>

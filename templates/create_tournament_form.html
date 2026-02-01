@@ -1,0 +1,102 @@
+<div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+    <div class="border-b border-gray-200 pb-4 mb-4">
+        <h2 class="text-xl font-bold text-gray-800">New Tournament Configuration</h2>
+        <p class="text-sm text-gray-500">Configure settings and select players from the active database.</p>
+    </div>
+
+    <form hx-post="/create_tournament" hx-target="#main-view" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-1">Tournament Title</label>
+                <input type="text" name="title" required placeholder="e.g. Winter Championship" 
+                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500 outline-none text-gray-800">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Year</label>
+                    <input id="year-input" type="number" name="year" required
+                           class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500 outline-none text-gray-800">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Rounds</label>
+                    <input type="number" name="round_count" value="8" required
+                           class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500 outline-none text-gray-800">
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-bold text-gray-700 mb-1">System</label>
+            <select name="round_system" id="system-select"
+                    class="w-full p-2 border border-gray-300 rounded bg-white text-gray-800 focus:ring-2 focus:ring-gray-500 outline-none"
+                    _="on change if me.value == 'berger' then add .hidden to #swiss-breaks then remove .hidden from #rr-breaks
+                       else add .hidden to #rr-breaks then remove .hidden from #swiss-breaks">
+                <option value="swiss">Swiss System</option>
+                <option value="berger">Round Robin (Berger)</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">
+                <span id="swiss-desc">Swiss: Generates only the 1st round.</span>
+                <span id="rr-desc" class="hidden">Berger: Generates schedule for ALL rounds immediately.</span>
+            </p>
+        </div>
+
+        <div class="bg-gray-50 p-3 rounded border border-gray-200">
+            <span class="text-xs font-bold text-gray-500 uppercase tracking-wide">Tie Breaks</span>
+            <div id="swiss-breaks" class="mt-2 flex flex-wrap gap-4">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="tie_break_swiss" value="modified_median" checked class="text-gray-800 focus:ring-gray-500 rounded">
+                    <span class="text-sm text-gray-700">Modified Median</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="tie_break_swiss" value="solkoff" checked class="text-gray-800 focus:ring-gray-500 rounded">
+                    <span class="text-sm text-gray-700">Solkoff</span>
+                </label>
+            </div>
+            <div id="rr-breaks" class="mt-2 flex flex-wrap gap-4 hidden">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="tie_break_rr" value="sonneborn_berger" checked class="text-gray-800 focus:ring-gray-500 rounded">
+                    <span class="text-sm text-gray-700">Sonneborn-Berger</span>
+                </label>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-bold text-gray-700 mb-1">Select Players</label>
+            <div class="relative">
+                <input type="text" 
+                       name="search"
+                       placeholder="Search existing players..." 
+                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500 outline-none text-gray-800"
+                       hx-post="/search_players" 
+                       hx-trigger="keyup changed delay:200ms" 
+                       hx-target="#search-results"
+                       hx-include="#current-selection-state"
+                       autocomplete="off">
+                <div id="search-results" class="absolute z-10 w-full bg-white border border-gray-200 shadow-lg rounded mt-1 max-h-48 overflow-y-auto empty:hidden"></div>
+            </div>
+
+            <div class="mt-4">
+                <p class="text-xs font-bold text-gray-500 uppercase mb-2">Selected Players (In Ranking Order)</p>
+                <div id="player-selection-container" class="border border-gray-200 rounded bg-gray-50 p-2 min-h-[100px]">
+                    {% with selected_players=[], selected_ids_str="" %}
+                        {% include "player_selection_list.html" %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button hx-get="/db_manager" hx-target="#main-view"
+                    class="px-4 py-2 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+                Cancel
+            </button>
+            <button type="submit"
+                    class="px-6 py-2 text-sm font-bold text-white bg-gray-800 rounded hover:bg-black shadow-sm transition-colors">
+                Initialize Tournament
+            </button>
+        </div>
+    </form>
+</div>
+<script>
+    document.getElementById('year-input').value = new Date().getFullYear();
+</script>

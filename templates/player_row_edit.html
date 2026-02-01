@@ -1,0 +1,27 @@
+<tr class="bg-blue-50">
+    <td class="p-4 text-gray-500 font-mono text-sm">#{{ player.identifier }}</td>
+    <td class="p-4">
+        <form id="edit-form-{{ player.identifier }}"
+              hx-put="/players/{{ player.identifier }}"
+              hx-target="closest tr"
+              hx-swap="outerHTML"
+              class="flex gap-2">
+            <input type="text" name="first_name" value="{{ player.first_name }}" required
+                   class="w-full p-1 border border-blue-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none">
+            <input type="text" name="last_name" value="{{ player.last_name }}" 
+                   class="w-full p-1 border border-blue-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none">
+        </form>
+    </td>
+    <td class="p-4 text-right flex justify-end gap-2">
+        <button type="submit" form="edit-form-{{ player.identifier }}"
+                class="bg-blue-600 text-white hover:bg-blue-700 text-xs font-bold py-1 px-3 rounded shadow-sm">
+            Save
+        </button>
+        <button hx-get="/players/{{ player.identifier }}/row"
+                hx-target="closest tr"
+                hx-swap="outerHTML"
+                class="bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 text-xs font-bold py-1 px-3 rounded shadow-sm">
+            Cancel
+        </button>
+    </td>
+</tr>

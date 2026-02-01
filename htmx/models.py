@@ -1,7 +1,5 @@
-from datetime import date, datetime, timedelta
 from typing import Optional, List
-
-from sqlmodel import Field, SQLModel, Relationship, select, Session
+from sqlmodel import Field, SQLModel, Relationship
 
 class PlayerTournamentLink(SQLModel, table=True):
     player_id: Optional[int] = Field(
@@ -18,7 +16,10 @@ class PlayerModel(SQLModel, table=True):
     last_name: str
     active: bool
 
-    tournaments: List["TournamentModel"] = Relationship(back_populates="players", link_model=PlayerTournamentLink)
+    tournaments: List["TournamentModel"] = Relationship(
+        back_populates="players", 
+        link_model=PlayerTournamentLink
+    )
 
 class TournamentModel(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -28,14 +29,23 @@ class TournamentModel(SQLModel, table=True):
     round_count: int
     round_system: int
 
-    players: List["PlayerModel"] = Relationship(back_populates="tournaments", link_model=PlayerTournamentLink)
-    rounds: List["RoundModel"] = Relationship(back_populates="tournament")
+    players: List["PlayerModel"] = Relationship(
+        back_populates="tournaments", 
+        link_model=PlayerTournamentLink
+    )
+    rounds: List["RoundModel"] = Relationship(
+        back_populates="tournament",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
 
 class RoundModel(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     index: int
-    matchups: List["MatchupModel"] = Relationship(back_populates="rounds")
+    matchups: List["MatchupModel"] = Relationship(
+        back_populates="rounds",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
     tournament_id: Optional[int] = Field(default=None, foreign_key="tournamentmodel.id")
     tournament: Optional[TournamentModel] = Relationship(back_populates='rounds')

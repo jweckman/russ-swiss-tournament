@@ -81,6 +81,10 @@ def calc_modified_median_solkoff(
     tournament_max_score = len(rounds)
     tournament_half_score = tournament_max_score / 2
     for player, scores in player_total_gains.items():
+        if not scores:
+            modified_median[player] = 0
+            solkoff[player] = 0
+            continue
         player_score = player_model_scores[player]
 
         mod_med_scores = scores.copy()

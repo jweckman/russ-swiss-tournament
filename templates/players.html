@@ -1,0 +1,65 @@
+<div class="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div class="p-6 border-b border-gray-200 bg-gray-50">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Player Management</h2>
+                <p class="text-sm text-gray-500">Add, edit, or remove players from the roster. Note that each tournament currently has its own set of players.</p>
+            </div>
+            <button hx-post="/db_select" 
+                    hx-vals='{"db_name": "{{ current_db }}"}'
+                    hx-target="#main-view" 
+                    class="text-sm text-gray-500 hover:text-gray-900 underline">
+                Back to Tournament
+            </button>
+        </div>
+
+        <form hx-post="/players/add" hx-target="#player-table-body" hx-swap="beforeend" 
+              class="flex gap-2 items-end"
+              _="on submit target.reset()">
+
+            <div class="w-24">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">ID</label>
+                <input type="number" name="identifier" required placeholder="101"
+                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500 outline-none">
+            </div>
+
+            <div class="flex-1">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">First Name</label>
+                <input type="text" name="first_name" required placeholder="e.g. Magnus"
+                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500 outline-none">
+            </div>
+            <div class="flex-1">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Last Name</label>
+                <input type="text" name="last_name" placeholder="e.g. Carlsen"
+                       class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-gray-500 outline-none">
+            </div>
+
+            <button type="submit" 
+                    class="bg-gray-800 hover:bg-black text-white font-bold py-2 px-6 rounded shadow-sm transition-colors h-[42px]">
+                Add Player
+            </button>
+        </form>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
+                    <th class="p-4 font-bold w-20">ID</th>
+                    <th class="p-4 font-bold">Full Name</th>
+                    <th class="p-4 font-bold text-right w-48">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="player-table-body" class="divide-y divide-gray-100">
+                {% for player in players %}
+                    {% include "player_row.html" %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if not players %}
+        <div id="empty-state" class="p-8 text-center text-gray-400 italic">
+            No players found. Add one above!
+        </div>
+        {% endif %}
+    </div>
+</div>

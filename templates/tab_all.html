@@ -1,15 +1,45 @@
-<div class="tab-list" role="tablist">
+<div class="flex border-b border-gray-300 mb-4 overflow-x-auto bg-white rounded-t-lg" 
+     role="tablist" 
+     hx-target="#tabs" 
+     hx-swap="innerHTML">
   {% for round in rounds %}
-    {% with round=round %}
-      {% include "tab_round.html" %}
-    {% endwith %}
+    {% if round.is_selected %}
+    <button 
+        class="py-2 px-4 font-bold m-0 rounded-none pointer-events-none cursor-default
+               bg-gray-100 text-gray-900 
+               !border-b-2 !border-gray-900
+               border-t-0 border-x-0 shadow-none"
+        >
+        Round {{ round.id }}
+    </button>
+    {% else %}
+    <button 
+        class="py-2 px-4 font-medium focus:outline-none m-0 rounded-none transition-colors
+               bg-white text-gray-500 hover:text-gray-900 hover:bg-gray-50
+               border-b-2 border-transparent 
+               border-t-0 border-x-0 shadow-none"
+        hx-get="/round_input/{{ round.id }}">
+        Round {{ round.id }}
+    </button>
+    {% endif %}
   {% endfor %}
-  <button 
-    role="tab"
-    aria-controls="tab-content"
-    aria-selected="false"
-    hx-get="/standings"
-  >
-    Standings
-  </button>
+
+  {% if is_standings %}
+    <button 
+        class="py-2 px-4 font-bold ml-auto m-0 rounded-none pointer-events-none cursor-default
+               bg-gray-100 text-gray-900 
+               !border-b-2 !border-gray-900
+               border-l border-gray-200 border-t-0 border-r-0 shadow-none"
+        >
+        Standings
+    </button>
+  {% else %}
+    <button 
+        class="py-2 px-4 font-medium focus:outline-none ml-auto m-0 rounded-none transition-colors
+               bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50
+               border-l border-gray-200 border-b-2 border-transparent border-t-0 border-r-0 shadow-none"
+        hx-get="/standings">
+        Standings
+    </button>
+  {% endif %}
 </div>

@@ -1,83 +1,74 @@
-from pathlib import Path
-
-import config
-
-from russ_swiss_tournament.tournament import Tournament, RoundSystem
-from russ_swiss_tournament.player import Player
-from russ_swiss_tournament.matchup_assignment import SwissAssigner, RoundRobinAssigner
-from russ_swiss_tournament.cli import main
-from russ_swiss_tournament.service import StartupMode
-
-import htmx.router
-from htmx.db import create_db_and_tables, populate_test_data
-
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from sqlmodel import Session
+import uvicorn
 
-def init_htmx():
-    '''Run application with web front-end'''
-    global app
-    app = FastAPI(default_response_class=HTMLResponse)
-    app.include_router(htmx.router.router)
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+import config
+import htmx.router
+from htmx.router import router, templates
+from htmx.db import create_db_and_tables, db_manager, NoDatabaseSelectedError
 
-def generate_round_robin_rounds():
-    Player.read_players_from_csv()
-    t = Tournament.from_toml(
-        Path.cwd() / 'tournaments' / 'russ_29' / 'config.toml',
-        read_rounds = True,
-        db = 'htmx',
-    )
-    config.tournament = t
-    # t.db_write([t])
-    # rra = RoudRobinAssigner(t)
-    # rra.prepare_tournament_rounds()
-    # for r in t.rounds:
-    #     r.write_csv(t.folder / 'rounds', db)
+from russ_swiss_tournament.matchup_assignment import SwissAssigner
 
-    # # Run app in CLI mode
-    # main(t)
+# --- Lifespan Manager ---
+# Runs automatically when FastAPI starts.
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application Startup Logic.
+    """
+    # 1. Initialize DB tables (Safe: checks internally if engine exists)
+    create_db_and_tables()
 
-def generate_first_swiss_round():
-    Player.read_players_from_csv()
-    t = Tournament.from_toml(
-        Path.cwd() / 'tournaments' / 'russ_32' / 'config.toml',
-        read_rounds = False,
-        db = 'htmx',
-    )
-    t._create_initial_round()
-    t.db_write([t])
-    config.tournament = t
+    # 2. Try to load the tournament context ONLY if a DB is selected
+    if db_manager.engine:
+        try:
+            with Session(db_manager.engine) as session:
+                print(f"INFO: Auto-loading tournament from {config.db_name}...")
+                loaded = config.load_tournament_context(session)
+                if loaded:
+                    print(f"INFO: Successfully loaded '{config.tournament.name}'")
+                else:
+                    print("INFO: Database is empty or valid tournament not found.")
+        except Exception as e:
+            print(f"WARNING: Could not auto-load tournament: {e}")
+    else:
+        # This is the normal state for a fresh install or when no DB is selected in config
+        print("INFO: No database auto-selected. Waiting for user input via Database Manager.")
 
-def initialize_from_db():
-    t = Tournament.from_db(
-        [1]
-    )
-    if t.round_system == RoundSystem.SWISS:
-        config.assigner = SwissAssigner(t)
-    elif t.round_system == RoundSystem.BERGER:
-        config.assigner = RoundRobinAssigner(t)
+    yield
+    # Shutdown logic (if any) goes here
 
-    config.tournament = t
+# --- App Initialization ---
+app = FastAPI(
+    default_response_class=HTMLResponse,
+    lifespan=lifespan
+)
 
-def startup():
-    if config.mode == StartupMode.START_FROM_DB:
-        initialize_from_db()
-        init_htmx()
-    if config.mode == StartupMode.INIT_SWISS:
-        config.tournament = generate_first_swiss_round()
-    if config.mode == StartupMode.INIT_ROUND_ROBIN:
-        config.tournament = generate_round_robin_rounds()
-    if config.mode == StartupMode.INIT_DB_TABLES:
-        create_db_and_tables()
-    if config.mode == StartupMode.INIT_DB_TABLES_WITH_TEST_DATA:
-        create_db_and_tables()
-        populate_test_data()
+@app.exception_handler(NoDatabaseSelectedError)
+async def no_db_exception_handler(request: Request, exc: NoDatabaseSelectedError):
+    """
+    Intercepts any request that fails due to missing DB context.
+    Renders the DB Manager with a warning banner.
+    """
+    databases = db_manager.get_available_dbs()
+    # If this is an HTMX request (e.g., clicking a tab), we render just the content.
+    # If it's a full page load, the TemplateResponse works for that too.
+    return templates.TemplateResponse("db_manager.html", {
+        "request": request,
+        "databases": databases,
+        "current_db": None,
+        "warning": "Please select a tournament database to continue."
+    })
 
+# --- Routing ---
+app.include_router(htmx.router.router)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-startup()
 
 if __name__ == "__main__":
-    create_db_and_tables()
-    populate_test_data()
+    # Allows running `python main.py` directly for development
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

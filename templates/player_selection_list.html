@@ -1,0 +1,37 @@
+<input type="hidden" id="current-selection-state" name="selected_player_ids_str" value="{{ selected_ids_str }}">
+
+{% if not selected_players %}
+    <p class="text-sm text-gray-400 text-center py-4 italic">No players selected yet.</p>
+{% else %}
+    {% for player in selected_players %}
+    <div class="flex items-center justify-between bg-white p-2 rounded border border-gray-200 shadow-sm mb-2 {{ 'animate-fadeIn' if player.identifier == highlight_id else '' }}">
+        <div class="flex items-center gap-3">
+            <div class="bg-gray-100 text-gray-500 text-xs font-mono px-2 py-1 rounded">#{{ player.identifier }}</div>
+            <span class="font-bold text-gray-700">{{ player.get_full_name() }}</span>
+        </div>
+        <div class="flex items-center gap-1">
+            <button type="button"
+                    hx-post="/player_selection/reorder?id={{ player.identifier }}&direction=up"
+                    hx-target="#player-selection-container"
+                    hx-include="#current-selection-state"
+                    class="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+            </button>
+            <button type="button" 
+                    hx-post="/player_selection/reorder?id={{ player.identifier }}&direction=down"
+                    hx-target="#player-selection-container"
+                    hx-include="#current-selection-state"
+                    class="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <button type="button" 
+                    hx-post="/player_selection/remove?id={{ player.identifier }}"
+                    hx-target="#player-selection-container"
+                    hx-include="#current-selection-state"
+                    class="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-600 ml-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+{% endif %}

@@ -1,19 +1,18 @@
 import itertools
 import csv
-from typing import Self
 from io import StringIO
 from pathlib import Path
-from typing import Type, Any
-
-from sqlmodel import select, col
+from typing import Any, Optional
 
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.player import Player
-from russ_swiss_tournament.db import Database
-from russ_swiss_tournament.service import MatchResult, Color, match_result_manual_map, match_result_score_map, match_result_score_text_map
-
-from htmx.db import get_session
-from htmx.models import RoundModel
+from russ_swiss_tournament.service import (
+    MatchResult,
+    Color,
+    match_result_manual_map,
+    match_result_score_map,
+    match_result_score_text_map,
+)
 
 class Round:
     '''Note: index var starts from 1 to match with csv file names'''
@@ -23,86 +22,14 @@ class Round:
             self,
             matchups: list[Matchup],
             index: int = 1,
-            id: int = -1,
+            id: Optional[int] = None,
         ):
-        if id == -1:
+        if id is None:
             self.id = next(self.id_iter) + 1
         else:
             self.id = id
         self.matchups = matchups
         self.index = index
-
-    @classmethod
-    def db_write(
-            cls,
-            selves: list[Self],
-            update: bool = True,
-        ):
-        '''Writes/updates selves to db'''
-        session = next(get_session())
-        ids = [r.index for r in selves]
-        existing_db = [r for r in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
-        existing_db_ids = [r.index for r in existing_db]
-
-        new_records: list[RoundModel] = []
-        for r_obj in selves:
-            db_round = None
-            if r_obj.index in existing_db_ids:
-                if update and len(existing_db) == 1:
-                    db_round = existing_db[0]
-                    [session.delete(m) for m in db_round.matchups]
-                    session.commit()
-                else:
-                    # TODO: implement multi-delete
-                    return []
-            if db_round:
-                Matchup.db_write(r_obj.matchups, round_id = db_round.id)
-            else:
-                new_record = RoundModel(
-                    index = r_obj.index,
-                    matchups = Matchup.db_write(r_obj.matchups),
-                    tournament_id = 1,  # TODO: hard coded
-                )
-                session.add(new_record)
-                session.flush()
-                session.refresh(new_record)
-                if new_record.id is None:
-                    raise ValueError("Trying to create a matchup without an id")
-                r_obj.id = new_record.id
-                session.commit()
-                new_records.append(new_record)
-        return new_records
-
-    @classmethod
-    def from_db(
-        cls: Type[Self],
-        selves: list[Self] | list[int],
-    ) -> tuple[list[Self], list[RoundModel]]:
-        session = next(get_session())
-        ids: list[int] = []
-        for t in selves:
-            if isinstance(t, cls):
-                ids.append(t.id)
-            elif isinstance(t, int):
-                ids.append(t)
-        existing_db = [t for t in session.exec(select(RoundModel).where(col(RoundModel.id).in_(ids)))]
-        if len(existing_db) != len(selves):
-            raise ValueError(
-                f"Trying to create {cls.__name__} from db records but some ids are missing.\n"
-                f"Please make sure that all the following ids are in the db: {ids}"
-            )
-        objects: list = []
-        for record in existing_db:
-            objects.append(
-                Round(
-                    id = record.id,
-                    index = record.index,
-                    matchups = Matchup.from_db(record.matchups)[0]
-                )
-            )
-        if not objects:
-            raise ValueError(f"Could not create {cls.__name__}, no matching records in db")
-        return objects, existing_db
 
     @classmethod
     def match_player(
@@ -181,7 +108,6 @@ class Round:
     def write_csv(
             self,
             path,
-            db: Database | None = None,
         ):
         '''Path refers to a folder. File names are automated based on round index'''
         with open(path / f"round{self.index}.csv", 'w', newline='') as csv_file:
@@ -190,12 +116,9 @@ class Round:
             round_writer.writerow(header_row)
             rows = []
             for m in self.matchups:
-                if db:
-                    white = db.get_player_by_id(m.res[Color.W].player.identifier).get_full_name()
-                    black = db.get_player_by_id(m.res[Color.B].player.identifier).get_full_name()
-                else:
-                    white = m.res[Color.W].player.identifier
-                    black = m.res[Color.B].player.identifier
+                # We can now rely on the objects having player data directly
+                white = m.res[Color.W].player.get_full_name()
+                black = m.res[Color.B].player.get_full_name()
                 row = [
                     white,
                     match_result_score_text_map[m.res[Color.W].res],
@@ -209,4 +132,3 @@ class Round:
         if any([MatchResult.UNSET in [x.res for x in v.res.values()] for v in self.matchups]):
             return False
         return True
-

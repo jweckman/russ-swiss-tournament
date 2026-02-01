@@ -1,107 +1,92 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* 1. Import the framework (replaces @tailwind base/components/utilities) */
+@import "tailwindcss";
 
-/* @layer base { */
-/*     html { */
-/*         @apply text-; */
-/*     } */
-/* } */
+/* 2. Configure your Theme here (Replaces tailwind.config.js) */
+@theme {
+  /* Colors */
+  --color-oldschool: #41FF00;
 
-@layer components {
-    button,
-    [type='button'],
-    [type='submit'],
-    [type='reset']
-    {
-        @apply self-center transition duration-500 ease-in-out bg-gray-500 hover:bg-gray-700 font-bold m-2 px-4 rounded;
-    }
+  /* Spacing */
+  --spacing-8xl: 96rem;
+
+  /* Font Sizes (size + line-height) */
+  --text-xs: 10px;
+  --text-xs--line-height: 16px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 20px;
+  --text-lg--line-height: 28px;
+  --text-xl: 24px;
+  --text-xl--line-height: 32px;
+
+  /* Animations */
+  --animate-fadeIn: fadeIn 150ms ease-in-out;
+  --animate-fadeOut: fadeOut 150ms ease-in-out;
+  --animate-zoomIn: zoomIn 150ms ease-in-out;
+  --animate-zoomOut: zoomOut 150ms ease-in-out;
 }
 
-/***** MODAL DIALOG ****/
+/* 3. Define Keyframes using standard CSS */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes zoomIn {
+  from { transform: scale(0.9); }
+  to { transform: scale(1); }
+}
+@keyframes zoomOut {
+  from { transform: scale(1); }
+  to { transform: scale(0.9); }
+}
+
+/* 4. Custom Utility Layer (Replaces @layer components) */
+/* In v4, you often just write CSS, but @utility creates proper Tailwind classes */
+
+@utility btn {
+  @apply self-center transition duration-200 ease-in-out font-bold m-2 px-4 py-2 rounded cursor-pointer;
+  @apply bg-white border border-gray-300 text-gray-700 shadow-sm;
+  @apply hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400;
+}
+
+/* Apply the button style to all button types automatically */
+button,
+[type='button'],
+[type='submit'],
+[type='reset'] {
+  @apply btn;
+}
+
+/* 5. Modal Styles */
+/* v4 handles standard CSS perfectly fine without needing @layer wrappers */
+
 #modal {
-    /* Underlay covers entire screen. */
-    position: fixed;
-    top:0px;
-    bottom: 0px;
-    left:0px;
-    right:0px;
-    background-color:rgba(0,0,0,0.5);
-    z-index:1000;
-
-    /* Flexbox centers the .modal-content vertically and horizontally */
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-
-    /* Animate when opening */
-    animation-name: fadeIn;
-    animation-duration:150ms;
-    animation-timing-function: ease;
+  @apply fixed inset-0 z-[1000] flex flex-col items-center;
+  background-color: rgba(0,0,0,0.5);
+  animation: var(--animate-fadeIn);
 }
 
 #modal > .modal-underlay {
-    /* underlay takes up the entire viewport. This is only
-    required if you want to click to dismiss the popup */
-    position: absolute;
-    z-index: -1;
-    top:0px;
-    bottom:0px;
-    left: 0px;
-    right: 0px;
+  @apply absolute inset-0 -z-10;
 }
 
 #modal > .modal-content {
-    /* Position visible dialog near the top of the window */
-    margin-top:10vh;
-
-    /* Sizing for visible dialog */
-    width:80%;
-    max-width:600px;
-
-    /* Display properties for visible dialog*/
-    border:solid 1px #999;
-    border-radius:8px;
-    box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.3);
-    background-color:white;
-    padding:20px;
-
-    /* Animate when opening */
-    animation-name:zoomIn;
-    animation-duration:150ms;
-    animation-timing-function: ease;
+  @apply mt-[10vh] w-[80%] max-w-[600px] bg-white rounded-lg p-5;
+  border: solid 1px #999;
+  box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.3);
+  animation: var(--animate-zoomIn);
 }
 
 #modal.closing {
-    /* Animate when closing */
-    animation-name: fadeOut;
-    animation-duration:150ms;
-    animation-timing-function: ease;
+  animation: var(--animate-fadeOut);
 }
 
 #modal.closing > .modal-content {
-    /* Animate when closing */
-    animation-name: zoomOut;
-    animation-duration:150ms;
-    animation-timing-function: ease;
-}
-
-@keyframes fadeIn {
-    0% {opacity: 0;}
-    100% {opacity: 1;}
-}
-
-@keyframes fadeOut {
-    0% {opacity: 1;}
-    100% {opacity: 0;}
-}
-
-@keyframes zoomIn {
-    0% {transform: scale(0.9);}
-    100% {transform: scale(1);}
-}
-
-@keyframes zoomOut {
-    0% {transform: scale(1);}
-    100% {transform: scale(0.9);}
+  animation: var(--animate-zoomOut);
 }
