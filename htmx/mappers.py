@@ -61,7 +61,7 @@ def to_domain_round(db_model: RoundModel, player_map: dict[int, Player]) -> Roun
 def to_domain_player(db_model: PlayerModel) -> Player:
     safe_id = ensure_int(db_model.id)
     return Player(
-        id=db_model.id,
+        db_id=db_model.id,
         identifier=db_model.identifier,
         first_name=db_model.first_name,
         last_name=db_model.last_name,
@@ -129,7 +129,7 @@ def to_db_matchup(domain: Matchup, round_id: int) -> MatchupModel:
         black_identifier=domain.get_black_id(),
         white_score=domain.get_white_score_int(),
         black_score=domain.get_black_score_int(),
-        # round_id is handled by SQLAlchemy relationship back_population
+        round_id=round_id,
     )
 
 def to_db_player(domain: Player) -> PlayerModel:
@@ -138,6 +138,6 @@ def to_db_player(domain: Player) -> PlayerModel:
         first_name=domain.first_name,
         last_name=domain.last_name,
         active=domain.active,
-        id=domain.id,
+        id=domain.db_id,
     )
 

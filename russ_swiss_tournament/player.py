@@ -7,13 +7,13 @@ class Player:
             first_name: str,
             last_name: str,
             active: bool = True,
-            id: int | None = None,
+            db_id: Optional[int] = None
         ):
         # Double check to prevent tuples creeping in from bad initializations
         if isinstance(id, tuple) and len(id) > 0:
-            self.id = id[0]
+            self.db_id = db_id[0]
         else:
-            self.id = id
+            self.db_id = db_id
         self.identifier = identifier
         self.first_name = first_name
         self.last_name = last_name

@@ -301,29 +301,23 @@ class Tournament:
         return index
 
     def get_standings(
-            self,
-            until: str | int = 'latest_complete'
-        ) -> dict[int, float] | None:
+        self,
+        until: str | int = 'latest_complete',
+    ) -> dict[int, float] | None:
         index = self._until_to_index(until)
-        # If index is None or 0, we can't calculate standings
         if not index:
             return None
-
         used_rounds = self.rounds[:index]
         if not used_rounds:
             return None
-
-        unsorted_standings: dict[int, float] = dict()
-        for i, r in enumerate(used_rounds):
-            if i == 0:
-                unsorted_standings = r.get_results()
-            else:
-                current_unsorted = Counter(unsorted_standings)
-                next_results = Counter(r.get_results())
-                # Don't include partial rounds
-                if any([v is None for v in next_results.values()]):
-                    break
-                unsorted_standings = dict(current_unsorted + next_results)
+        unsorted_standings: dict[int, float] = {p.identifier: 0.0 for p in self.players}
+        for r in used_rounds:
+            round_results = r.get_results()
+            if any(v is None for v in round_results.values()):
+                break
+            current_total = Counter(unsorted_standings)
+            round_scores = Counter(round_results)
+            unsorted_standings = dict(current_total + round_scores)
         for p in self.players:
             if p.identifier not in unsorted_standings:
                 unsorted_standings[p.identifier] = 0

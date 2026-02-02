@@ -6,41 +6,44 @@
   <form class="bg-gray-100 rounded-lg shadow p-4" hx-post="/round_update/{{round_id}}" hx-target="#tabs" hx-swap="innerHTML">
     <p class="text-lg font-bold text-center text-gray-700 mb-4">Round {{round_id}} Results</p>
     <div class="w-11/12 md:w-3/4 mx-auto space-y-3">
-    {% for m in matchups %}
-    <div class="flex items-center gap-4 bg-white p-2 rounded border border-gray-200">
-      <div class="flex-1 text-right">
-        <label for="matchup_input_{{m.white_identifier}}" class="font-medium text-gray-800">{{m.white_full_name}}</label>
-      </div>
-      <div class="flex gap-2 justify-center items-center bg-gray-50 p-1 rounded">
-        <select
-          class="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-gray-500 outline-none bg-white text-gray-700"
-          id="matchup_input_{{m.white_identifier}}"
-          _="on change put white_black_result_map[me.value] into #matchup_result_black_{{m.black_identifier}}
-             then put white_black_result_map[me.value] into #matchup_result_black_{{m.black_identifier}}_input.value"
-          name="matchup_input_{{m.white_identifier}}">
-          <option value="unset" {{'selected' if (m.white_score|default('unset')) == 'unset'}}> - </option>
-          <option value="1" {{'selected' if (m.white_score|default('unset')) == 1}}>1</option>
-          <option value="0" {{'selected' if (m.white_score|default('unset')) == 0}}>0</option>
-          <option value="0.5" {{'selected' if (m.white_score|default('unset')) == 0.5}}>½</option>
-        </select>
+    {% for matchup in matchups %}
+        <div class="flex items-center gap-4 bg-white p-2 rounded border border-gray-200 shadow-sm">
+          <div class="flex-1 text-right">
+            <label for="res_{{ matchup.white_identifier }}_{{ matchup.black_identifier }}" 
+                   class="font-medium text-gray-800 cursor-pointer">
+               {{ matchup.white_full_name }}
+               <span class="text-xs text-gray-400 ml-1">({{ matchup.white_score }})</span>
+            </label>
+          </div>
 
-        <span class="text-gray-400 font-bold">-</span>
+          <div class="flex-shrink-0">
+            <select name="result_{{ matchup.white_identifier }}_{{ matchup.black_identifier }}" 
+                    id="res_{{ matchup.white_identifier }}_{{ matchup.black_identifier }}"
+                    class="text-center font-bold border border-gray-300 rounded px-3 py-1 bg-gray-50 hover:bg-white focus:ring-2 focus:ring-gray-500 outline-none cursor-pointer">
+              <option value="unset" {% if matchup.white_score == 'unset' %}selected{% endif %} class="text-gray-400">
+                - vs -
+              </option>
+              <option value="1-0" {% if matchup.white_score == 1 %}selected{% endif %} class="text-gray-900">
+                1 - 0
+              </option>
+              <option value="0.5-0.5" {% if matchup.white_score == 0.5 %}selected{% endif %} class="text-gray-900">
+                ½ - ½
+              </option>
+              <option value="0-1" {% if matchup.white_score == 0 %}selected{% endif %} class="text-gray-900">
+                0 - 1
+              </option>
 
-        <div class="w-10 text-center font-bold bg-white border border-gray-300 rounded py-1 text-sm">
-           <p id="matchup_result_black_{{m.black_identifier}}">{{m.black_score|default('-')}}</p>
+            </select>
+          </div>
+
+          <div class="flex-1 text-left">
+            <p class="font-medium text-gray-800">
+              {{ matchup.black_full_name }}
+              <span class="text-xs text-gray-400 ml-1">({{ matchup.black_score }})</span>
+            </p>
+          </div>
+
         </div>
-        <input
-          id="matchup_result_black_{{m.black_identifier}}_input"
-          type="hidden"
-          name="matchup_result_black_{{m.black_identifier}}"
-          value="{{m.black_score|default('unset')}}"
-        />
-      </div>
-
-      <div class="flex-1 text-left">
-        <p class="font-medium text-gray-800">{{m.black_full_name}}</p>
-      </div>
-    </div>
     {% endfor %}
     <div class="text-center mt-6">
         <input

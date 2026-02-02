@@ -16,16 +16,46 @@ from htmx.db import get_session, db_manager, create_db_and_tables
 from htmx.seeder import seed_default_tournament, read_players_from_csv
 from htmx.repository import TournamentRepository
 
-from russ_swiss_tournament.service import match_result_score_map, Color, match_result_manual_map
+from russ_swiss_tournament.service import match_result_score_map, Color, match_result_manual_map, MatchResult
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
 from russ_swiss_tournament.round import Round
 from russ_swiss_tournament.tournament import Tournament, RoundSystem, Player
 from russ_swiss_tournament.matchup_assignment import SwissAssigner
 
+RESULT_STRING_MAP = {
+    "1-0":     (MatchResult.WIN, MatchResult.LOSS),
+    "0-1":     (MatchResult.LOSS, MatchResult.WIN),
+    "0.5-0.5": (MatchResult.DRAW, MatchResult.DRAW),
+    "unset":   (MatchResult.UNSET, MatchResult.UNSET)
+}
+
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["config"] = config
 
 router = APIRouter()
+
+def save_and_reload_config(session: Session):
+    """
+    Saves the current tournament state to DB, then immediately RELOADS it.
+    This prevents 'Zombie' states where the in-memory object drifts from the DB.
+    """
+    repo = TournamentRepository(session)
+    # 1. Save current state
+    repo.save_tournament(config.tournament)
+    # 2. Reload fresh state from DB
+    # We must commit first to ensure data is queryable
+    session.commit()
+    # 3. Refresh the global config object
+    # This replaces the 'stale' object with a fresh one from the DB
+    refreshed_tournament = repo.get_active_tournament()
+    if refreshed_tournament:
+        config.tournament = refreshed_tournament
+        # Re-link the assigner to the new tournament object
+        if config.tournament.round_system == RoundSystem.SWISS:
+             config.assigner = SwissAssigner(config.tournament)
+    else:
+        # Should never happen if save matched, but safety first
+        print("CRITICAL WARNING: Could not reload tournament after save.")
 
 def get_tournament_rounds_data(selected_index: int | None = 1) -> list[dict[str, Any]]:
     """
@@ -180,55 +210,32 @@ async def round_update(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    round = config.tournament.get_round_by_index(round_id)
-    if not round:
-        raise ValueError(
-            f"Could find round with id {round_id} when updating rounds. This should not happen."
-        )
+    round_domain = config.tournament.get_round_by_index(round_id)
+    if not round_domain:
+        raise ValueError(f"Round {round_id} not found.")
+
     form_data = await request.form()
-    matchups: list = []
-    for player, result in form_data.items():
-        player_parts = player.split('_')
-        player_identifier = player_parts[-1]
-        is_black = player_parts[-2] == 'black'
-        matchup = round.get_player_matchup(player_identifier)
-        if not matchup:
-            raise ValueError(
-                f"Could not get player matchup for player identifier {player_identifier} "
-                "when updating rounds. This should not happen."
-            )
-        if is_black:
-            matchup.res[Color.B].res = match_result_manual_map[result]
-        else:
-            matchup.res[Color.W].res = match_result_manual_map[result]
-        if matchup.id not in [m.id for m in matchups]:
-            matchups.append(matchup)
-    repo = TournamentRepository(session)
-    repo.save_tournament(config.tournament)
+    for key, value in form_data.items():
+        # We only care about our result inputs: "result_10_11" (WhiteID_BlackID)
+        if key.startswith("result_"):
+            parts = key.split('_') # ['result', '10', '11']
+            if len(parts) != 3: continue
+            white_id = int(parts[1])
+            # Find the matchup object for this pair
+            # (Using get_player_matchup is safe because IDs are unique per round)
+            matchup = round_domain.get_player_matchup(white_id)
+            if matchup and value in RESULT_STRING_MAP:
+                w_res, b_res = RESULT_STRING_MAP[value]
+                # Update Domain Object
+                matchup.res[Color.W].res = w_res
+                matchup.res[Color.B].res = b_res
 
+    # 3. Save & Reload (Using our Safe Helper)
+    save_and_reload_config(session)
 
-    config.tournament.validate_no_incomplete_match_results_in_rounds()
+    # 4. Return updated form
     context = get_round_input_context(round_id, request=request, session=session)
-
     return templates.TemplateResponse("round_form.html", context)
-
-    # TODO: repetition, make prettier
-    if round:
-        is_complete = round.is_complete()
-    else:
-        is_complete = False
-
-    context = {
-        "request": request,
-        "round": {
-            "is_complete": is_complete,
-            "id": round.id,
-            "is_selected": True,
-        },
-        "rounds": get_tournament_rounds_data(round_id)
-    }
-    return templates.TemplateResponse("tab_round.html", context)
-
 
 @router.get("/generate_round/{round_id}")
 async def round_generate(
@@ -452,18 +459,35 @@ async def create_tournament_post(
     safe_filename = safe_filename.replace(' ', '_').lower()
     db_name = f"{safe_filename}.sqlite"
 
+    available_players_map = {}
+
     all_csv_players = read_players_from_csv()
-    csv_player_map = {p.identifier: p for p in all_csv_players}
+    for p in all_csv_players:
+        available_players_map[p.identifier] = p
+
+    if config.tournament:
+        for p in config.tournament.players:
+            # We overwrite/add to the map. This preserves custom players 
+            # and uses the most recent name edits from the UI.
+            available_players_map[p.identifier] = p
 
     new_players_list = []
     for pid in selected_player_ids:
-        if pid in csv_player_map:
-            new_players_list.append(csv_player_map[pid])
+        if pid in available_players_map:
+            # We create a FRESH instance to detach from old DB sessions
+            source_p = available_players_map[pid]
+            new_p = Player(
+                identifier=source_p.identifier,
+                first_name=source_p.first_name,
+                last_name=source_p.last_name,
+                active=True 
+            )
+            new_players_list.append(new_p)
         else:
-            print(f"Warning: Selected Player ID {pid} not found in CSV.")
+            print(f"Warning: Selected Player ID {pid} not found in CSV or current Tournament.")
 
     if not new_players_list:
-        return HTMLResponse("Error: Selected players could not be found in player.csv")
+        return HTMLResponse("Error: Selected players could not be found.")
 
     if config.tournament:
         source_players_map = {p.identifier: p for p in config.tournament.players}
@@ -676,11 +700,9 @@ async def player_selection_add(
     selected_player_ids_str: str = Form("")
 ):
     current_ids = [str(x) for x in selected_player_ids_str.split(',') if x.strip()]
-    # Only add (and highlight) if not already present
     if str(id) not in current_ids:
         current_ids.append(str(id))
         return render_player_selection_list(request, ",".join(current_ids), highlight_id=id)
-    # If already exists, just return list without highlight (or you could highlight to show 'it's here')
     return render_player_selection_list(request, ",".join(current_ids), highlight_id=id)
 
 @router.post("/player_selection/remove")
@@ -736,35 +758,25 @@ async def player_add(
     if not config.tournament:
         return HTMLResponse("")
 
-    # Validation: Check if ID already exists
     if any(p.identifier == identifier for p in config.tournament.players):
-        return HTMLResponse(f"""
-            <tr class="bg-red-50 border-b border-red-100 animate-fadeIn">
-                <td colspan="3" class="p-4 text-red-600 font-bold text-center">
-                    Error: Player ID {identifier} already exists.
-                    <button class="ml-2 underline text-red-800" onclick="this.closest('tr').remove()">Dismiss</button>
-                </td>
-            </tr>
-        """)
+        return HTMLResponse(f"<tr><td class='text-red-600'>Error: ID {identifier} exists</td></tr>")
 
-    # Generate new ID (Max existing + 1)
-    existing_ids = [p.identifier for p in config.tournament.players]
-    new_id = max(existing_ids) + 1 if existing_ids else 1
     new_player = Player(
-        identifier=new_id,
+        identifier=identifier,
         first_name=first_name,
         last_name=last_name,
         active=True
     )
     config.tournament.players.append(new_player)
-    # Save to DB
-    repo = TournamentRepository(session)
-    repo.save_tournament(config.tournament)
-    session.commit()
-    # Return just the new row
+    try:
+        save_and_reload_config(session)
+    except RuntimeError as e:
+        print(e)
+        return HTMLResponse("<tr><td>Database Error. Refresh page.</td></tr>")
+    saved_player = config.tournament.get_player_by_id(identifier)
     return templates.TemplateResponse("player_row.html", {
         "request": request,
-        "player": new_player
+        "player": saved_player
     })
 
 @router.delete("/players/{player_id}")
@@ -774,15 +786,29 @@ async def player_delete(
 ):
     if not config.tournament:
         return HTMLResponse("")
-    # Find and Remove
-    player = config.tournament.get_player_by_id(player_id)
-    if player:
+    try:
+        player = config.tournament.get_player_by_id(player_id)
+    except IndexError:
+        return HTMLResponse("")
+
+    has_played = False
+    for r in config.tournament.rounds:
+        for m in r.matchups:
+            if player_id in m.get_player_ids():
+                has_played = True
+                break
+        if has_played: break
+
+    if has_played:
+        player.active = False
+    else:
         config.tournament.players.remove(player)
-        # Save to DB
-        repo = TournamentRepository(session)
-        repo.save_tournament(config.tournament)
-        session.commit()
-    # Return empty string to remove the row from DOM
+        if player.db_id:
+            from htmx.models import PlayerModel
+            db_row = session.get(PlayerModel, player.db_id)
+            if db_row: session.delete(db_row)
+
+    save_and_reload_config(session)
     return HTMLResponse("")
 
 @router.get("/players/{player_id}/edit")
