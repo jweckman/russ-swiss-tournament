@@ -47,40 +47,37 @@ class Round:
         return res
 
     @classmethod
-    def read_csv(
-            cls,
-            path: str | Path | StringIO,
-            index,
-            players: list[Player] = []
-        ):
+    def read_csv(cls, file_handle, round_index, players: list[Player]) -> "Round":
+        import csv
+        player_map = {p.get_full_name().lower().strip(): p for p in players}
         matchups = []
-        csv_file: Any
-        if isinstance(path, str) or isinstance(path, Path):
-            csv_file = open(path, newline='')
-        elif isinstance(path, StringIO):
-            csv_file = path
-        try:
-            round_reader = csv.reader(csv_file, delimiter=',', quotechar='"')
-            headers = next(round_reader, None)
-            for line in round_reader:
-                white_player = cls.match_player(line[0], players)
-                black_player = cls.match_player(line[2], players)
-                if (white_player is None
-                        or black_player is None
-                        or any([pid not in [x.identifier for x in players] for pid in [white_player.identifier, black_player.identifier]])):
-                    raise ValueError(
-                        f"Could not match player {line[0]} or player {line[2]} "
-                        "based on id or full name. Check exact typing from database"
-                    )
-                matchup = Matchup({
-                    Color.W: PlayerMatch(white_player, match_result_manual_map[line[1]]),
-                    Color.B: PlayerMatch(black_player, match_result_manual_map[line[3]])
-                })
-                matchups.append(matchup)
-        finally:
-            if isinstance(path, str) or isinstance(path, Path):
-                csv_file.close()
-        return cls(matchups, index)
+        reader = csv.DictReader(file_handle)
+        for row in reader:
+            w_name = row['white'].strip().lower()
+            b_name = row['black'].strip().lower()
+            p_white = player_map.get(w_name)
+            p_black = player_map.get(b_name)
+            if not p_white or not p_black:
+                print(f"WARNING: CSV Upload could not find player(s): '{w_name}' or '{b_name}'")
+                continue
+
+            def parse_score(val):
+                val = val.strip()
+                if val == '1': return MatchResult.WIN
+                if val == '0': return MatchResult.LOSS
+                if val == '0.5' or val == '1/2': return MatchResult.DRAW
+                return MatchResult.UNSET
+
+            res_w = parse_score(row['score_white'])
+            res_b = parse_score(row['score_black'])
+
+            m = Matchup({
+                Color.W: PlayerMatch(p_white, res_w),
+                Color.B: PlayerMatch(p_black, res_b)
+            })
+            matchups.append(m)
+
+        return cls(matchups, round_index)
 
     def get_results(self) -> dict[int, float]:
         player_ids = self.get_player_ids()

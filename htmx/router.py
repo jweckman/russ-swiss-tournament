@@ -90,17 +90,30 @@ async def index(request: Request):
 
 @router.post("/upload_round_csv/{round_id}")
 async def upload_round_csv(
-    round_id: int,
-    *,
-    file: Annotated[bytes, File()],
-    session: Session = Depends(get_session),
-    request: Request,
-):
+        round_id: int,
+        *,
+        file: Annotated[bytes, File()],
+        session: Session = Depends(get_session),
+        request: Request,
+    ):
     content = file.decode()
     file_text = StringIO(content)
-    round = Round.read_csv(file_text, round_id, config.tournament.players)
-    repo = TournamentRepository(session)
-    repo.save_tournament(config.tournament)
+    new_round_obj = Round.read_csv(file_text, round_id, config.tournament.players)
+    found = False
+    for i, r in enumerate(config.tournament.rounds):
+        if r.index == round_id:
+            new_round_obj.id = r.id 
+            config.tournament.rounds[i] = new_round_obj
+            found = True
+            break
+    if not found:
+        config.tournament.rounds.append(new_round_obj)
+    try:
+        save_and_reload_config(session)
+    except Exception as e:
+        print(f"Error saving CSV upload: {e}")
+        return HTMLResponse("<div>Error saving data. Check server logs.</div>")
+
     context = get_round_input_context(round_id, session=session, request=request)
     return templates.TemplateResponse("round_form.html", context)
 
