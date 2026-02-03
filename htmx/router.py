@@ -328,52 +328,42 @@ async def player_rounds_modal(
     return templates.TemplateResponse("player_rounds_modal.html", context)
 
 @router.post("/db_select")
-async def select_database(
+async def select_database_post(
     request: Request,
-    db_name: Annotated[str, Form()],
+    db_name: str = Form(...)
 ):
-    print(f"--- RESETTING CONTEXT TO: {db_name} ---")
-    tournament = cast(Tournament, config.tournament)
+    if not db_name.endswith(".sqlite"):
+        db_name += ".sqlite"
+    db_folder = Path("databases")
+    if not (db_folder / db_name).exists():
+        return HTMLResponse("Error: Database file not found.")
 
-    # 1. HARD RESET: Clear Global Memory State
-    config.tournament = None
-    config.assigner = None
-    config.db_name = db_name  # Set the new name immediately
-
-    # 2. HARD RESET: Database Engine
-    # This disposes the old connection and creates a fresh one pointing to the new file
+    print(f"--- SWITCHING TO: {db_name} ---")
+    config.db_name = db_name
     db_manager.set_db(db_name)
-    # 3. Initialize Tables (Safe to run if they exist, ensures file validity)
-    create_db_and_tables()
 
-    # 4. HARD RESET: Reload Data from the NEW Engine
-    # We explicitly open a session from the manager we just updated
     with Session(db_manager.engine) as session:
-        # Verify we are reading the right file
-        current_db_path = session.bind.url.database
-        if db_name not in current_db_path:
-            raise RuntimeError(f"Engine Mismatch! Tried to load {db_name} but engine has {current_db_path}")
-
-        found = config.load_tournament_context(session)
-        if not found:
-            print(f"Database {db_name} is empty. Seeding from default TOML...")
-            new_tournament = seed_default_tournament(session)
-            # Re-save to ensure it's persisted in the new file
-            repo = TournamentRepository(session)
-            repo.save_tournament(new_tournament)
-            session.commit()
-            # Update global config with the fresh object
-            config.tournament = new_tournament
-            config.assigner = SwissAssigner(new_tournament)
+        repo = TournamentRepository(session)
+        tournament = repo.get_active_tournament()
+        if tournament:
+            config.tournament = tournament
+            if tournament.round_system == RoundSystem.SWISS:
+                config.assigner = SwissAssigner(tournament)
+            print(f"INFO: Successfully loaded '{tournament.name}'")
+            # Render the dashboard immediately
+            rounds_data = get_tournament_rounds_data(1)
+            return templates.TemplateResponse("tournament_container.html", {
+                "request": request,
+                "current_db": db_name,
+                "rounds": rounds_data,
+                "config": config
+            })
         else:
-            print(f"Successfully loaded tournament: {tournament.name}")
-
-    context = {
-        "request": request,
-        "current_db": db_name,
-        "config": config 
-    }
-    return templates.TemplateResponse("tournament_container.html", context)
+            # Handle empty database case
+            config.tournament = None
+            return HTMLResponse(
+                f"<div class='p-4 text-red-600'>Error: Database '{db_name}' contains no active tournament.</div>"
+            )
 
 @router.post("/db_create")
 async def create_database(
@@ -451,44 +441,70 @@ async def create_tournament_post(
     tie_break_swiss: list[str] = Form(default=[]),
     tie_break_rr: list[str] = Form(default=[])
 ):
-    selected_player_ids = set()
+    ordered_selected_ids = []
     if selected_player_ids_str:
         try:
-            selected_player_ids = {int(x) for x in selected_player_ids_str.split(',') if x.strip()}
+            raw_ids = [int(x) for x in selected_player_ids_str.split(',') if x.strip()]
+            # Remove duplicates while preserving order
+            seen = set()
+            for x in raw_ids:
+                if x not in seen:
+                    ordered_selected_ids.append(x)
+                    seen.add(x)
         except ValueError:
             pass
-    if not selected_player_ids or len(selected_player_ids) < 2:
+
+    if not ordered_selected_ids or len(ordered_selected_ids) < 2:
          return HTMLResponse("Error: Need at least 2 players selected.")
 
+    # --- Validation ---
+    n_playing = len(ordered_selected_ids)
     if round_system == 'swiss':
-        n_playing = len(selected_player_ids)
         max_possible = n_playing if n_playing % 2 != 0 else n_playing - 1
         if round_count > max_possible:
-             return HTMLResponse(f"Error: Too many rounds for {n_playing} players (max {max_possible}).")
+             return HTMLResponse(f"Error: Swiss Max rounds for {n_playing} players is {max_possible}.")
+    elif round_system == 'berger':
+        max_possible = n_playing - 1 if n_playing % 2 == 0 else n_playing
+        if round_count > max_possible:
+            return HTMLResponse(f"Error: Round Robin max rounds for {n_playing} players is {max_possible}.")
 
+    # 2. Setup New Database Name
     safe_filename = "".join([c for c in title if c.isalnum() or c in (' ', '-', '_')]).rstrip()
     safe_filename = safe_filename.replace(' ', '_').lower()
     db_name = f"{safe_filename}.sqlite"
 
-    unique_players_map = {}
+    csv_player_map = {}
     for p in read_players_from_csv():
         try:
-            pid = int(p.identifier)
-            unique_players_map[pid] = p
-        except (ValueError, TypeError):
+            csv_player_map[int(p.identifier)] = p
+        except ValueError:
             pass
 
     final_roster = []
-    for pid in sorted(unique_players_map.keys()):
-        p = unique_players_map[pid]
-        is_selected = pid in selected_player_ids
-        new_p = Player(
-            identifier=pid,
-            first_name=p.first_name,
-            last_name=p.last_name,
-            active=is_selected 
-        )
-        final_roster.append(new_p)
+    processed_ids = set()
+
+    for pid in ordered_selected_ids:
+        if pid in csv_player_map:
+            p = csv_player_map[pid]
+            new_p = Player(
+                identifier=pid,
+                first_name=p.first_name,
+                last_name=p.last_name,
+                active=True # Active!
+            )
+            final_roster.append(new_p)
+            processed_ids.add(pid)
+
+    for pid in sorted(csv_player_map.keys()):
+        if pid not in processed_ids:
+            p = csv_player_map[pid]
+            new_p = Player(
+                identifier=pid,
+                first_name=p.first_name,
+                last_name=p.last_name,
+                active=False # Inactive
+            )
+            final_roster.append(new_p)
 
     print(f"--- CREATING & SWITCHING TO: {db_name} ---")
     db_folder = Path("databases")
@@ -496,7 +512,6 @@ async def create_tournament_post(
     db_path = db_folder / db_name
     if db_path.exists():
         try:
-            # Dispose engine if it's currently locking this file
             if config.db_name == db_name:
                 db_manager.engine.dispose()
             os.remove(db_path)
@@ -511,44 +526,45 @@ async def create_tournament_post(
     with Session(db_manager.engine) as session:
         from htmx.mappers import to_db_player
 
+        # A. Save Full Roster (DB doesn't care about order)
         for p in final_roster:
             db_p = to_db_player(p)
             db_p = session.merge(db_p)
             session.flush()
             p.db_id = db_p.id
 
+        # B. Active Only (PRESERVE ORDER from final_roster)
+        # final_roster starts with the active players in ranked order.
         active_roster = [p for p in final_roster if p.active]
         rs_enum = RoundSystem.SWISS if round_system == 'swiss' else RoundSystem.BERGER
 
-        # SQLAlchemy will only create link-table rows for these players.
+        # C. Create Tournament
         new_tourney = Tournament(
             name=title,
             players=active_roster, 
             rounds=[], 
-            round_count=round_count,
+            round_count=round_count, 
             round_system=rs_enum,
             tie_break_results_swiss={},
             tie_break_results_round_robin={},
             year=year,
             count=0,
+            # This order is now [Seed1, Seed2, Seed3...]
             player_tournament_start_order=[p.identifier for p in active_roster]
         )
+        # Generate Initial Rounds
         if rs_enum == RoundSystem.SWISS:
+            # SwissAssigner will now see players[0] as the top seed.
             new_tourney._create_initial_round()
         elif rs_enum == RoundSystem.BERGER:
-            # --- BERGER (ROUND ROBIN) LOGIC ---
+            # --- BERGER LOGIC ---
             n = len(active_roster)
+            # Use the ordered list for the rotation
             rotation_ids = [p.identifier for p in active_roster]
-            # If odd number of players, add a "ghost" to make even pairs
             if n % 2 != 0:
                 rotation_ids.append(None)
                 n += 1
-            # Berger standard is N-1 rounds
-            total_rr_rounds = n - 1
-            # Update tournament count to match reality
-            new_tourney.round_count = total_rr_rounds
-
-            for r_idx in range(total_rr_rounds):
+            for r_idx in range(round_count): 
                 half = n // 2
                 l1 = rotation_ids[:half]
                 l2 = rotation_ids[half:][::-1]
@@ -556,37 +572,27 @@ async def create_tournament_post(
                 for i in range(half):
                     p1_id = l1[i]
                     p2_id = l2[i]
-                    # If neither ID is None (Ghost), create a match
                     if p1_id is not None and p2_id is not None:
                         p1 = next(p for p in active_roster if p.identifier == p1_id)
                         p2 = next(p for p in active_roster if p.identifier == p2_id)
-                        # Alternating Colors Logic
-                        if r_idx % 2 == 0: 
-                            w, b = p1, p2
-                        else: 
-                            w, b = p2, p1
+                        if r_idx % 2 == 0: w, b = p1, p2
+                        else: w, b = p2, p1
                         round_matchups.append(Matchup({
                             Color.W: PlayerMatch(w), 
                             Color.B: PlayerMatch(b)
                         }))
-                # Create the Round
                 new_tourney.rounds.append(Round(matchups=round_matchups, index=r_idx + 1))
-                # Rotate players: Keep index 0 fixed, rotate the rest clockwise
                 rotation_ids = [rotation_ids[0]] + [rotation_ids[-1]] + rotation_ids[1:-1]
-            # --- END BERGER LOGIC ---
+            # --- END BERGER ---
 
-        # SAVE TOURNAMENT
         repo = TournamentRepository(session)
-        # This will merge the tournament and link the players in 'new_tourney.players'
         repo.save_tournament(new_tourney)
         session.commit()
-        # Update Global Config
         config.tournament = new_tourney
         if rs_enum == RoundSystem.SWISS:
              config.assigner = SwissAssigner(new_tourney)
 
     rounds_data = get_tournament_rounds_data(1)
-
     return templates.TemplateResponse("tournament_container.html", {
         "request": request,
         "current_db": db_name,
