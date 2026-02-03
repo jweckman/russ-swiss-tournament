@@ -1,12 +1,11 @@
-from typing import Annotated, Any
-from datetime import datetime, timedelta, date
+from typing import Annotated, Any, cast
 from io import StringIO
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, Depends, Request, Query, Form, APIRouter, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 
 from sqlmodel import Session
 
@@ -15,6 +14,7 @@ import config
 from htmx.db import get_session, db_manager, create_db_and_tables
 from htmx.seeder import seed_default_tournament, read_players_from_csv
 from htmx.repository import TournamentRepository
+from htmx.models import PlayerModel
 
 from russ_swiss_tournament.service import match_result_score_map, Color, match_result_manual_map, MatchResult
 from russ_swiss_tournament.matchup import Matchup, PlayerMatch
@@ -39,9 +39,13 @@ def save_and_reload_config(session: Session):
     Saves the current tournament state to DB, then immediately RELOADS it.
     This prevents 'Zombie' states where the in-memory object drifts from the DB.
     """
+    if config.tournament is None:
+        raise ValueError("Attempted to save configuration but no tournament is loaded.")
+    tournament = cast(Tournament, config.tournament)
+
     repo = TournamentRepository(session)
     # 1. Save current state
-    repo.save_tournament(config.tournament)
+    repo.save_tournament(tournament)
     # 2. Reload fresh state from DB
     # We must commit first to ensure data is queryable
     session.commit()
@@ -96,18 +100,19 @@ async def upload_round_csv(
         session: Session = Depends(get_session),
         request: Request,
     ):
+    tournament = cast(Tournament, config.tournament)
     content = file.decode()
     file_text = StringIO(content)
-    new_round_obj = Round.read_csv(file_text, round_id, config.tournament.players)
+    new_round_obj = Round.read_csv(file_text, round_id, tournament.players)
     found = False
-    for i, r in enumerate(config.tournament.rounds):
+    for i, r in enumerate(tournament.rounds):
         if r.index == round_id:
             new_round_obj.id = r.id 
-            config.tournament.rounds[i] = new_round_obj
+            tournament.rounds[i] = new_round_obj
             found = True
             break
     if not found:
-        config.tournament.rounds.append(new_round_obj)
+        tournament.rounds.append(new_round_obj)
     try:
         save_and_reload_config(session)
     except Exception as e:
@@ -136,20 +141,18 @@ def get_round_input_context(
     round_index: int,
     request: Request,
     session: Session, 
-) -> dict:
+) -> dict[str, Any]:
     """
     Builds the dictionary for the round form template.
     Refactored to read from config.tournament (Domain Object) instead of DB.
     """
     if not config.tournament:
          return {"request": request, "error": "No tournament loaded"}
+    tournament = cast(Tournament, config.tournament)
 
-    # 1. Get Domain Round
-    # Note: round_index is 1-based (1, 2, 3...)
-    round_domain = config.tournament.get_round_by_index(round_index)
+    round_domain = tournament.get_round_by_index(round_index)
 
     if not round_domain:
-        # Graceful fallback if round doesn't exist yet
         return {
             "request": request,
             "matchups": [],
@@ -158,52 +161,47 @@ def get_round_input_context(
             "rounds": get_tournament_rounds_data(round_index),
             "is_last_round": False
         }
-
-    matchups: list = []
-    # 2. Get Standings for Ranking Logic
-    # (Used to determine 'top_ranked_index' for sorting the table)
-    standings = config.tournament.get_sorted_standings(until=round_index - 1)
-    player_ranks: list[int] = list(standings.keys()) if standings else []
-
-    # 3. Build Matchup Data from Domain Objects
+    matchups: list[dict[str, Any]] = []
+    standings = tournament.get_sorted_standings(until=round_index - 1)
+    player_ranks: list[int] = []
+    if standings:
+        player_ranks = list(standings.keys())
     for mu in round_domain.matchups:
-        matchup: dict[str, Any] = dict()
         white_id = mu.get_white_id()
         black_id = mu.get_black_id()
-        # --- Calculate Rank Index for Sorting ---
         w_rank = 999
         b_rank = 999
         if player_ranks:
-            if white_id in player_ranks: w_rank = player_ranks.index(white_id)
-            if black_id in player_ranks: b_rank = player_ranks.index(black_id)
-        matchup['top_ranked_index'] = min(w_rank, b_rank)
+            if white_id in player_ranks: 
+                w_rank = player_ranks.index(white_id)
+            if black_id in player_ranks: 
+                b_rank = player_ranks.index(black_id)
+        top_ranked_index = min(w_rank, b_rank)
 
-        # --- Names ---
-        matchup['white_full_name'] = mu.res[Color.W].player.get_full_name()
-        matchup['black_full_name'] = mu.res[Color.B].player.get_full_name()
-        # --- Scores ---
-        # Map Enum (WIN/LOSS/DRAW) to values (1, 0, 0.5) for the HTML select box
         w_res_enum = mu.res[Color.W].res
         b_res_enum = mu.res[Color.B].res
-        matchup['white_score'] = match_result_score_map.get(w_res_enum, 'unset')
-        matchup['black_score'] = match_result_score_map.get(b_res_enum, 'unset')
-        matchup['white_identifier'] = white_id
-        matchup['black_identifier'] = black_id
-        matchups.append(matchup)
+        matchup_data = {
+            'top_ranked_index': top_ranked_index,
+            'white_full_name': mu.res[Color.W].player.get_full_name(),
+            'black_full_name': mu.res[Color.B].player.get_full_name(),
+            'white_score': match_result_score_map.get(w_res_enum, 'unset'),
+            'black_score': match_result_score_map.get(b_res_enum, 'unset'),
+            'white_identifier': white_id,
+            'black_identifier': black_id,
+        }
+        matchups.append(matchup_data)
 
-    # 4. Sort Matchups by Rank (standard Chess tournament display)
     if round_index != 1 and player_ranks:
-        matchups = sorted(matchups, key = lambda m: m['top_ranked_index'])
+        matchups = sorted(matchups, key=lambda m: m['top_ranked_index'])
 
     context = {
         "request": request,
         "matchups": matchups,
         "round_id": round_index,
         "is_complete": round_domain.is_complete(),
-        "rounds": get_tournament_rounds_data(round_index)
+        "rounds": get_tournament_rounds_data(round_index),
+        "is_last_round": len(tournament.rounds) == tournament.round_count
     }
-    # Check if this is the final round defined in settings
-    context['is_last_round'] = len(config.tournament.rounds) == config.tournament.round_count
     return context
 
 @router.get("/round_input/{round_id}")
@@ -223,30 +221,28 @@ async def round_update(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    round_domain = config.tournament.get_round_by_index(round_id)
+    if not config.tournament:
+        raise ValueError("Tournament is not initialized.")
+    tournament = cast(Tournament, config.tournament)
+    round_domain = tournament.get_round_by_index(round_id)
     if not round_domain:
         raise ValueError(f"Round {round_id} not found.")
 
     form_data = await request.form()
     for key, value in form_data.items():
-        # We only care about our result inputs: "result_10_11" (WhiteID_BlackID)
-        if key.startswith("result_"):
-            parts = key.split('_') # ['result', '10', '11']
-            if len(parts) != 3: continue
-            white_id = int(parts[1])
-            # Find the matchup object for this pair
-            # (Using get_player_matchup is safe because IDs are unique per round)
-            matchup = round_domain.get_player_matchup(white_id)
-            if matchup and value in RESULT_STRING_MAP:
-                w_res, b_res = RESULT_STRING_MAP[value]
-                # Update Domain Object
-                matchup.res[Color.W].res = w_res
-                matchup.res[Color.B].res = b_res
-
-    # 3. Save & Reload (Using our Safe Helper)
+        if not key.startswith("result_"):
+            continue
+        parts = key.split('_')
+        if len(parts) != 3:
+            continue
+        white_id = int(parts[1])
+        matchup = round_domain.get_player_matchup(white_id)
+        if matchup and value in RESULT_STRING_MAP:
+            w_res, b_res = RESULT_STRING_MAP[value]
+            matchup.res[Color.W].res = w_res
+            matchup.res[Color.B].res = b_res
     save_and_reload_config(session)
 
-    # 4. Return updated form
     context = get_round_input_context(round_id, request=request, session=session)
     return templates.TemplateResponse("round_form.html", context)
 
@@ -256,13 +252,14 @@ async def round_generate(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    prev_round: Round = config.tournament.get_round_by_index(round_id - 1)
-    config.assigner = SwissAssigner(config.tournament)
+    tournament = cast(Tournament, config.tournament)
+    prev_round: Round = tournament.get_round_by_index(round_id - 1)
+    config.assigner = SwissAssigner(tournament)
     if not isinstance(config.assigner, SwissAssigner):
         raise ValueError("Can only generate new round with SwissAssigner mapped to config")
     new_round: Round = config.assigner.create_next_round()
     repo = TournamentRepository(session)
-    repo.save_tournament(config.tournament)
+    repo.save_tournament(tournament)
 
     context = get_round_input_context(round_id, request=request, session=session)
     return templates.TemplateResponse("round_form.html", context)
@@ -272,14 +269,15 @@ async def standings_get(
     request: Request,
     session: Session = Depends(get_session),
 ):
+    tournament = cast(Tournament, config.tournament)
     res: list = []
-    t: Tournament = config.tournament
+    t: Tournament = tournament
     s = t.get_sorted_standings()
     if not s:
         raise ValueError("Could not get standings. Probably no complete rounds yet")
     full_names = {p.identifier: p.get_full_name() for p in t.players}
-    sonne, koya = config.tournament.get_tie_break_results_round_robin()
-    modified_median, solkoff = config.tournament.get_tie_break_results_swiss()
+    sonne, koya = tournament.get_tie_break_results_round_robin()
+    modified_median, solkoff = tournament.get_tie_break_results_swiss()
     for id, score in s.items():
         name = full_names[id]
         info: dict[str, Any] = {'name': name}
@@ -313,8 +311,9 @@ async def player_rounds_modal(
     request: Request,
     session: Session = Depends(get_session),
 ):
+    tournament = cast(Tournament, config.tournament)
     res: list[dict] = []
-    t: Tournament = config.tournament
+    t: Tournament = tournament
     player = t.get_player_by_id(player_identifier)
     for round in t.rounds:
         mu = round.get_player_matchup(player_identifier)
@@ -334,6 +333,7 @@ async def select_database(
     db_name: Annotated[str, Form()],
 ):
     print(f"--- RESETTING CONTEXT TO: {db_name} ---")
+    tournament = cast(Tournament, config.tournament)
 
     # 1. HARD RESET: Clear Global Memory State
     config.tournament = None
@@ -366,7 +366,7 @@ async def select_database(
             config.tournament = new_tournament
             config.assigner = SwissAssigner(new_tournament)
         else:
-            print(f"Successfully loaded tournament: {config.tournament.name}")
+            print(f"Successfully loaded tournament: {tournament.name}")
 
     context = {
         "request": request,
@@ -451,88 +451,79 @@ async def create_tournament_post(
     tie_break_swiss: list[str] = Form(default=[]),
     tie_break_rr: list[str] = Form(default=[])
 ):
-    selected_player_ids = []
+    selected_player_ids = set()
     if selected_player_ids_str:
         try:
-            selected_player_ids = [int(x) for x in selected_player_ids_str.split(',') if x.strip()]
+            selected_player_ids = {int(x) for x in selected_player_ids_str.split(',') if x.strip()}
         except ValueError:
             pass
+    if not selected_player_ids or len(selected_player_ids) < 2:
+         return HTMLResponse("Error: Need at least 2 players selected.")
 
-    if not selected_player_ids:
-        return HTMLResponse("Error: No players selected.")
-    n_players = len(selected_player_ids)
-    if n_players < 2:
-        return HTMLResponse(f"Error: Need at least 2 players (got {n_players}).")
     if round_system == 'swiss':
-        max_possible_rounds = n_players if n_players % 2 != 0 else n_players - 1
-        if round_count > max_possible_rounds:
-             return HTMLResponse(f"Error: Too many rounds for Swiss system (max {max_possible_rounds}).")
+        n_playing = len(selected_player_ids)
+        max_possible = n_playing if n_playing % 2 != 0 else n_playing - 1
+        if round_count > max_possible:
+             return HTMLResponse(f"Error: Too many rounds for {n_playing} players (max {max_possible}).")
 
     safe_filename = "".join([c for c in title if c.isalnum() or c in (' ', '-', '_')]).rstrip()
     safe_filename = safe_filename.replace(' ', '_').lower()
     db_name = f"{safe_filename}.sqlite"
 
-    available_players_map = {}
+    unique_players_map = {}
+    for p in read_players_from_csv():
+        try:
+            pid = int(p.identifier)
+            unique_players_map[pid] = p
+        except (ValueError, TypeError):
+            pass
 
-    all_csv_players = read_players_from_csv()
-    for p in all_csv_players:
-        available_players_map[p.identifier] = p
-
-    if config.tournament:
-        for p in config.tournament.players:
-            # We overwrite/add to the map. This preserves custom players 
-            # and uses the most recent name edits from the UI.
-            available_players_map[p.identifier] = p
-
-    new_players_list = []
-    for pid in selected_player_ids:
-        if pid in available_players_map:
-            # We create a FRESH instance to detach from old DB sessions
-            source_p = available_players_map[pid]
-            new_p = Player(
-                identifier=source_p.identifier,
-                first_name=source_p.first_name,
-                last_name=source_p.last_name,
-                active=True 
-            )
-            new_players_list.append(new_p)
-        else:
-            print(f"Warning: Selected Player ID {pid} not found in CSV or current Tournament.")
-
-    if not new_players_list:
-        return HTMLResponse("Error: Selected players could not be found.")
-
-    if config.tournament:
-        source_players_map = {p.identifier: p for p in config.tournament.players}
-    else:
-        source_players_map = {} 
+    final_roster = []
+    for pid in sorted(unique_players_map.keys()):
+        p = unique_players_map[pid]
+        is_selected = pid in selected_player_ids
+        new_p = Player(
+            identifier=pid,
+            first_name=p.first_name,
+            last_name=p.last_name,
+            active=is_selected 
+        )
+        final_roster.append(new_p)
 
     print(f"--- CREATING & SWITCHING TO: {db_name} ---")
+    db_folder = Path("databases")
+    db_folder.mkdir(exist_ok=True)
+    db_path = db_folder / db_name
+    if db_path.exists():
+        try:
+            # Dispose engine if it's currently locking this file
+            if config.db_name == db_name:
+                db_manager.engine.dispose()
+            os.remove(db_path)
+            print(f"Deleted existing database: {db_name}")
+        except Exception as e:
+            print(f"Error deleting old DB: {e}")
+
     config.db_name = db_name
     db_manager.set_db(db_name)
     create_db_and_tables()
 
-    new_players_list = []
-    for pid in selected_player_ids:
-        if pid in source_players_map:
-            old_p = source_players_map[pid]
-            new_p = Player(
-                identifier=old_p.identifier,
-                first_name=old_p.first_name,
-                last_name=old_p.last_name,
-                active=True 
-            )
-            new_players_list.append(new_p)
-
-    # Open Session on the NEW (Global) Engine
-    # Since db_manager.set_db() was called, this session is bound to the new file.
     with Session(db_manager.engine) as session:
+        from htmx.mappers import to_db_player
+
+        for p in final_roster:
+            db_p = to_db_player(p)
+            db_p = session.merge(db_p)
+            session.flush()
+            p.db_id = db_p.id
+
+        active_roster = [p for p in final_roster if p.active]
         rs_enum = RoundSystem.SWISS if round_system == 'swiss' else RoundSystem.BERGER
 
-        # Create Domain Tournament Object
+        # SQLAlchemy will only create link-table rows for these players.
         new_tourney = Tournament(
             name=title,
-            players=new_players_list, 
+            players=active_roster, 
             rounds=[], 
             round_count=round_count,
             round_system=rs_enum,
@@ -540,21 +531,22 @@ async def create_tournament_post(
             tie_break_results_round_robin={},
             year=year,
             count=0,
-            player_tournament_start_order=[p.identifier for p in new_players_list]
+            player_tournament_start_order=[p.identifier for p in active_roster]
         )
-        # --- Generate Rounds ---
         if rs_enum == RoundSystem.SWISS:
             new_tourney._create_initial_round()
         elif rs_enum == RoundSystem.BERGER:
-            # (Berger Logic - same as before)
-            rr_players = list(new_players_list)
-            n = len(rr_players)
-            rotation_ids = [p.identifier for p in rr_players]
+            # --- BERGER (ROUND ROBIN) LOGIC ---
+            n = len(active_roster)
+            rotation_ids = [p.identifier for p in active_roster]
+            # If odd number of players, add a "ghost" to make even pairs
             if n % 2 != 0:
                 rotation_ids.append(None)
                 n += 1
+            # Berger standard is N-1 rounds
             total_rr_rounds = n - 1
-            new_tourney.round_count = total_rr_rounds 
+            # Update tournament count to match reality
+            new_tourney.round_count = total_rr_rounds
 
             for r_idx in range(total_rr_rounds):
                 half = n // 2
@@ -564,28 +556,37 @@ async def create_tournament_post(
                 for i in range(half):
                     p1_id = l1[i]
                     p2_id = l2[i]
+                    # If neither ID is None (Ghost), create a match
                     if p1_id is not None and p2_id is not None:
-                        p1 = next(p for p in rr_players if p.identifier == p1_id)
-                        p2 = next(p for p in rr_players if p.identifier == p2_id)
-                        if r_idx % 2 == 0: w, b = p1, p2
-                        else: w, b = p2, p1
-                        m = Matchup({Color.W: PlayerMatch(w), Color.B: PlayerMatch(b)})
-                        round_matchups.append(m)
+                        p1 = next(p for p in active_roster if p.identifier == p1_id)
+                        p2 = next(p for p in active_roster if p.identifier == p2_id)
+                        # Alternating Colors Logic
+                        if r_idx % 2 == 0: 
+                            w, b = p1, p2
+                        else: 
+                            w, b = p2, p1
+                        round_matchups.append(Matchup({
+                            Color.W: PlayerMatch(w), 
+                            Color.B: PlayerMatch(b)
+                        }))
+                # Create the Round
                 new_tourney.rounds.append(Round(matchups=round_matchups, index=r_idx + 1))
+                # Rotate players: Keep index 0 fixed, rotate the rest clockwise
                 rotation_ids = [rotation_ids[0]] + [rotation_ids[-1]] + rotation_ids[1:-1]
+            # --- END BERGER LOGIC ---
 
-        # SAVE (Now safe, because config.db_name == session.db)
+        # SAVE TOURNAMENT
         repo = TournamentRepository(session)
+        # This will merge the tournament and link the players in 'new_tourney.players'
         repo.save_tournament(new_tourney)
         session.commit()
-
-        # Update Global Objects
+        # Update Global Config
         config.tournament = new_tourney
         if rs_enum == RoundSystem.SWISS:
              config.assigner = SwissAssigner(new_tourney)
 
-    # 9. Return View
     rounds_data = get_tournament_rounds_data(1)
+
     return templates.TemplateResponse("tournament_container.html", {
         "request": request,
         "current_db": db_name,
@@ -593,22 +594,25 @@ async def create_tournament_post(
         "config": config
     })
 
-
-# --- PLAYER MANAGEMENT ROUTES ---
-
 @router.post("/search_players")
 async def search_players(
     request: Request,
     search: str = Form(""),
     selected_player_ids_str: str = Form(""),
 ):
-    if not config.tournament or not search:
+    if not search:
         return HTMLResponse("")
 
+    all_players = read_players_from_csv()
+
     query = search.lower()
-    current_ids = [int(x) for x in selected_player_ids_str.split(',') if x.strip()]
+    try:
+        current_ids = [int(x) for x in selected_player_ids_str.split(',') if x.strip()]
+    except ValueError:
+        current_ids = []
+
     matches = [
-        p for p in config.tournament.players 
+        p for p in all_players 
         if (query in p.get_full_name().lower() or query in str(p.identifier))
         and p.identifier not in current_ids
     ]
@@ -622,8 +626,8 @@ async def search_players(
              hx-target="#player-selection-container"
              hx-include="#current-selection-state"
              onclick="let self=this; setTimeout(function(){{ 
-                 document.querySelector('input[name=search]').value='';
-                 document.querySelector('#search-results').innerHTML='';
+                 document.querySelector('input[name=search]').value=''; 
+                 document.querySelector('#search-results').innerHTML=''; 
              }}, 100);">
             <span class="font-medium text-gray-800">{p.get_full_name()}</span>
             <span class="text-xs text-gray-400 group-hover:text-gray-600">ID: {p.identifier}</span>
@@ -686,10 +690,14 @@ def render_player_selection_list(request: Request, ids_str: str, highlight_id: i
     except ValueError:
         id_list = []
 
-    if not config.tournament:
-        players_map = {}
-    else:
-        players_map = {p.identifier: p for p in config.tournament.players}
+    players_map = {}
+    if config.tournament:
+        for p in config.tournament.players:
+            players_map[p.identifier] = p
+    csv_players = read_players_from_csv()
+    for p in csv_players:
+        if p.identifier not in players_map:
+            players_map[p.identifier] = p
 
     ordered_players = []
     valid_ids = []
@@ -703,7 +711,7 @@ def render_player_selection_list(request: Request, ids_str: str, highlight_id: i
         "request": request,
         "selected_players": ordered_players,
         "selected_ids_str": new_ids_str,
-        "highlight_id": highlight_id,
+        "highlight_id": highlight_id
     })
 
 @router.post("/player_selection/add")
@@ -799,27 +807,28 @@ async def player_delete(
 ):
     if not config.tournament:
         return HTMLResponse("")
+    tournament = cast(Tournament, config.tournament)
+
     try:
-        player = config.tournament.get_player_by_id(player_id)
-    except IndexError:
+        player = tournament.get_player_by_id(player_id)
+    except (IndexError, ValueError):
         return HTMLResponse("")
 
-    has_played = False
-    for r in config.tournament.rounds:
-        for m in r.matchups:
-            if player_id in m.get_player_ids():
-                has_played = True
-                break
-        if has_played: break
+    has_played = any(
+        player_id in m.get_player_ids()
+        for r in tournament.rounds
+        for m in r.matchups
+    )
 
     if has_played:
         player.active = False
     else:
-        config.tournament.players.remove(player)
+        if player in tournament.players:
+            tournament.players.remove(player)
         if player.db_id:
-            from htmx.models import PlayerModel
             db_row = session.get(PlayerModel, player.db_id)
-            if db_row: session.delete(db_row)
+            if db_row:
+                session.delete(db_row)
 
     save_and_reload_config(session)
     return HTMLResponse("")

@@ -7,10 +7,8 @@ import uvicorn
 
 import config
 import htmx.router
-from htmx.router import router, templates
+from htmx.router import templates
 from htmx.db import create_db_and_tables, db_manager, NoDatabaseSelectedError
-
-from russ_swiss_tournament.matchup_assignment import SwissAssigner
 
 # --- Lifespan Manager ---
 # Runs automatically when FastAPI starts.
